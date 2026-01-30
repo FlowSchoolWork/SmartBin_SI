@@ -1,7 +1,7 @@
 """
-Smart Bin SI - Module de Détection YOLO
-Intègre YOLOv5/YOLOv8 pour la détection temps-réel via caméra
-Remplace la saisie manuelle par la détection automatique
+Smart Bin SI - Détecteur YOLO avec Caméra
+Détecte les objets via caméra et utilise waste_classifier pour le tri
+Support pour l'apprentissage : correction manuelle et ajout d'images
 """
 
 import cv2
@@ -11,21 +11,8 @@ import numpy as np
 from pathlib import Path
 import sys
 
-# Ajouter le script principal au path pour utiliser les fonctions de base de données
-sys.path.append(str(Path(__file__).parent))
-
-try:
-    from waste_classifier import (
-        init_database, 
-        get_or_assign_bin_color, 
-        send_sorting_command,
-        init_serial_connection
-    )
-    MAIN_SCRIPT_AVAILABLE = True
-except ImportError:
-    print("⚠ Attention : Script principal non trouvé")
-    MAIN_SCRIPT_AVAILABLE = False
-
+# Importer le module de classification
+import waste_classifier
 
 # ============================================
 # CONFIGURATION
@@ -38,8 +25,7 @@ IOU_THRESHOLD = 0.45           # Seuil IoU pour la suppression non-maximale
 
 # Configuration caméra
 CAMERA_SOURCE = 0  # 0 pour caméra USB, ou "rtsp://..." pour caméra IP
-# Pour caméra CSI Jetson, utiliser le pipeline gstreamer (voir ci-dessous)
-USE_CSI_CAMERA = False
+USE_CSI_CAMERA = False  # True pour caméra Raspberry Pi sur Jetson
 
 # Configuration affichage
 SHOW_DISPLAY = True
@@ -47,30 +33,13 @@ FRAME_WIDTH = 640
 FRAME_HEIGHT = 480
 
 # Comportement de détection
-AUTO_SORT_DELAY = 2.0  # Secondes d'attente avant le tri auto d'un objet détecté
+AUTO_SORT_DELAY = 2.0  # Secondes d'attente avant le tri auto
 MIN_DETECTIONS = 3     # Nombre minimum de détections consécutives avant tri
 
-
-# Mapping catégorie de déchet → couleur de bac
-# Personnaliser selon les classes de ton modèle entraîné
-WASTE_TO_BIN_MAPPING = {
-    # Recyclable (Bac jaune)
-    "plastic_bottle": "yellow",
-    "cardboard": "yellow",
-    "paper": "yellow",
-    "metal_can": "yellow",
-    "glass": "yellow",
-    
-    # Organique (Bac vert)
-    "food_waste": "green",
-    "organic": "green",
-    "biodegradable": "green",
-    
-    # Déchets généraux (Bac marron)
-    "general_waste": "brown",
-    "non_recyclable": "brown",
-    "mixed": "brown",
-}
+# Mode d'apprentissage
+LEARNING_MODE = True   # Si True, permet de corriger les détections
+SAVE_IMAGES = True     # Si True, sauvegarde les images pour entraînement
+IMAGES_DIR = "data/captured_images"  # Dossier pour les images capturées
 
 
 # ============================================
@@ -108,7 +77,7 @@ def get_csi_pipeline(camera_id=0, width=640, height=480, fps=30):
 class WasteDetector:
     """
     Système de détection de déchets basé sur YOLO
-    S'intègre avec la base de données et le contrôleur Arduino existants
+    Utilise waste_classifier pour la logique de tri
     """
     
     def __init__(self, model_path=MODEL_PATH):
@@ -129,16 +98,15 @@ class WasteDetector:
         self.last_detection = None
         self.detection_count = 0
         self.last_sort_time = 0
+        self.last_frame = None  # Pour sauvegarder l'image lors de corrections
         
-        # Initialiser la base de données et le port série si disponibles
-        if MAIN_SCRIPT_AVAILABLE:
-            self.serial_conn = init_serial_connection()
-            self.db_conn, self.db_cursor = init_database()
-        else:
-            print("⚠ Mode autonome (pas de DB/Arduino)")
-            self.serial_conn = None
-            self.db_conn = None
-            self.db_cursor = None
+        # Initialiser les connexions via waste_classifier
+        waste_classifier.init_serial_connection()
+        waste_classifier.init_database()
+        
+        # Créer le dossier pour les images capturées
+        if SAVE_IMAGES:
+            Path(IMAGES_DIR).mkdir(parents=True, exist_ok=True)
         
         print("✓ Détecteur initialisé\n")
     
@@ -235,31 +203,6 @@ class WasteDetector:
         
         return detections
     
-    def map_to_bin(self, waste_class):
-        """
-        Mapper une classe de déchet détectée vers la couleur du bac
-        
-        Args:
-            waste_class: Nom de la classe de déchet détectée
-        
-        Retourne:
-            str: Couleur du bac (yellow/green/brown) ou None si inconnu
-        """
-        # Mapping direct depuis la configuration
-        if waste_class in WASTE_TO_BIN_MAPPING:
-            return WASTE_TO_BIN_MAPPING[waste_class]
-        
-        # Solution de secours : vérifier la base de données si disponible
-        if MAIN_SCRIPT_AVAILABLE and self.db_cursor:
-            bin_color = get_or_assign_bin_color(
-                self.db_cursor, 
-                self.db_conn, 
-                waste_class
-            )
-            return bin_color
-        
-        return None
-    
     def should_trigger_sort(self, detection):
         """
         Décider si on doit déclencher l'action de tri
@@ -296,6 +239,20 @@ class WasteDetector:
         
         return False
     
+    def get_bin_color_for_display(self, waste_class):
+        """
+        Obtenir la couleur du bac pour l'affichage (sans trier)
+        
+        Args:
+            waste_class: Nom de la classe de déchet
+        
+        Retourne:
+            str: Couleur du bac ou None
+        """
+        # Chercher en base de données sans sauvegarder
+        bin_color = waste_classifier.get_bin_color(waste_class)
+        return bin_color
+    
     def draw_detections(self, frame, detections):
         """
         Dessiner les boîtes de détection et labels sur l'image
@@ -312,8 +269,8 @@ class WasteDetector:
             class_name = det['class']
             confidence = det['confidence']
             
-            # Obtenir la couleur du bac pour ce déchet
-            bin_color = self.map_to_bin(class_name)
+            # Obtenir la couleur du bac pour ce déchet (juste pour affichage)
+            bin_color = self.get_bin_color_for_display(class_name)
             
             # Choisir la couleur d'affichage selon le bac
             if bin_color == "yellow":
@@ -332,11 +289,79 @@ class WasteDetector:
             label = f"{class_name} ({confidence:.2f})"
             if bin_color:
                 label += f" -> {bin_color}"
+            else:
+                label += " -> ?"
             
-            cv2.putText(frame, label, (x1, y1-10), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+            # Fond pour le texte
+            (text_width, text_height), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
+            cv2.rectangle(frame, (x1, y1-text_height-10), (x1+text_width, y1), color, -1)
+            
+            # Texte
+            cv2.putText(frame, label, (x1, y1-5), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), 2)
         
         return frame
+    
+    def save_image_for_training(self, frame, class_name, correct=True):
+        """
+        Sauvegarder une image pour l'entraînement futur
+        
+        Args:
+            frame: Image à sauvegarder
+            class_name: Nom de la classe
+            correct: True si c'est une bonne détection, False si erreur
+        """
+        if not SAVE_IMAGES:
+            return
+        
+        # Créer le dossier pour cette classe
+        class_dir = Path(IMAGES_DIR) / class_name
+        class_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Nom du fichier avec timestamp
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        prefix = "correct" if correct else "incorrect"
+        filename = class_dir / f"{prefix}_{timestamp}.jpg"
+        
+        # Sauvegarder
+        cv2.imwrite(str(filename), frame)
+        print(f"💾 Image sauvegardée : {filename}")
+    
+    def handle_correction(self, frame, detected_class):
+        """
+        Gérer la correction manuelle d'une détection
+        
+        Args:
+            frame: Image actuelle
+            detected_class: Classe détectée par YOLO
+        """
+        print(f"\n⚠ YOLO a détecté : '{detected_class}'")
+        print("Est-ce correct ?")
+        print("  y - Oui, c'est correct")
+        print("  n - Non, corriger")
+        print("  skip - Ignorer")
+        
+        choice = input("Votre choix : ").strip().lower()
+        
+        if choice == 'y':
+            print("✓ Détection confirmée")
+            self.save_image_for_training(frame, detected_class, correct=True)
+            return detected_class
+        
+        elif choice == 'n':
+            print("\nQuel est le vrai nom de cet objet ?")
+            correct_name = input("Nom correct : ").strip()
+            
+            if correct_name:
+                # Sauvegarder avec le nom correct
+                self.save_image_for_training(frame, correct_name, correct=True)
+                # Sauvegarder aussi comme erreur pour le nom détecté
+                self.save_image_for_training(frame, detected_class, correct=False)
+                print(f"✓ Correction enregistrée : {detected_class} → {correct_name}")
+                return correct_name
+        
+        print("⊘ Détection ignorée")
+        return None
     
     def run_camera_detection(self):
         """
@@ -363,6 +388,9 @@ class WasteDetector:
         print("  'q' - Quitter")
         print("  's' - Forcer le tri de la détection actuelle")
         print("  'r' - Réinitialiser le compteur de détections")
+        if LEARNING_MODE:
+            print("  'c' - Corriger la dernière détection")
+        print("  'stats' - Voir les statistiques")
         print("="*50 + "\n")
         
         fps_time = time.time()
@@ -376,6 +404,9 @@ class WasteDetector:
                 if not ret:
                     print("✗ Échec de lecture de l'image")
                     break
+                
+                # Sauvegarder la dernière frame pour corrections
+                self.last_frame = frame.copy()
                 
                 # Exécuter la détection YOLO
                 results = self.detect_waste(frame)
@@ -391,17 +422,26 @@ class WasteDetector:
                     
                     if self.should_trigger_sort(best_detection):
                         waste_class = best_detection['class']
-                        bin_color = self.map_to_bin(waste_class)
+                        
+                        # En mode apprentissage, demander confirmation
+                        if LEARNING_MODE:
+                            corrected_class = self.handle_correction(self.last_frame, waste_class)
+                            if corrected_class is None:
+                                continue  # Ignoré par l'utilisateur
+                            waste_class = corrected_class
+                        
+                        print(f"\n🎯 TRI AUTO DÉCLENCHÉ : {waste_class}")
+                        
+                        # Utiliser waste_classifier pour le tri
+                        # ask_if_unknown=True pour permettre d'apprendre
+                        bin_color = waste_classifier.classify_and_sort(
+                            waste_class,
+                            ask_if_unknown=True,
+                            auto_mode=False
+                        )
                         
                         if bin_color:
-                            print(f"\n🎯 TRI AUTO DÉCLENCHÉ : {waste_class} → bac {bin_color}")
-                            
-                            if MAIN_SCRIPT_AVAILABLE and self.serial_conn:
-                                send_sorting_command(self.serial_conn, bin_color)
-                            else:
-                                print(f"   [SIMULATION] Trierait vers {bin_color}")
-                        else:
-                            print(f"\n⚠ Type de déchet inconnu : {waste_class}")
+                            print(f"✓ Trié vers le bac {bin_color}")
                 
                 # Calculer les FPS
                 fps_counter += 1
@@ -412,33 +452,64 @@ class WasteDetector:
                 
                 # Afficher les infos sur l'image
                 if SHOW_DISPLAY:
+                    # Info FPS et détections
                     info_text = f"FPS: {fps_display} | Detections: {len(detections)}"
                     cv2.putText(frame, info_text, (10, 30), 
                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
                     
+                    # Suivi de détection
                     if self.last_detection:
                         status_text = f"Suivi: {self.last_detection['class']} ({self.detection_count}/{MIN_DETECTIONS})"
                         cv2.putText(frame, status_text, (10, 60), 
                                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
                     
+                    # Mode
+                    mode_text = "Mode: Apprentissage" if LEARNING_MODE else "Mode: Auto"
+                    cv2.putText(frame, mode_text, (10, FRAME_HEIGHT - 10), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 255), 2)
+                    
                     cv2.imshow('Smart Bin - Detection', frame)
                 
                 # Gérer les entrées clavier
                 key = cv2.waitKey(1) & 0xFF
+                
                 if key == ord('q'):
                     print("\n👋 Arrêt de la détection...")
                     break
+                
                 elif key == ord('s'):
-                    if detections and MAIN_SCRIPT_AVAILABLE:
+                    # Tri manuel forcé
+                    if detections:
                         best = max(detections, key=lambda x: x['confidence'])
-                        bin_color = self.map_to_bin(best['class'])
-                        if bin_color:
-                            print(f"\n⚡ TRI MANUEL : {best['class']} → {bin_color}")
-                            send_sorting_command(self.serial_conn, bin_color)
+                        waste_class = best['class']
+                        print(f"\n⚡ TRI MANUEL FORCÉ : {waste_class}")
+                        waste_classifier.classify_and_sort(
+                            waste_class,
+                            ask_if_unknown=True,
+                            auto_mode=False
+                        )
+                
                 elif key == ord('r'):
+                    # Réinitialiser le compteur
                     self.detection_count = 0
                     self.last_detection = None
                     print("\n↻ Compteur de détections réinitialisé")
+                
+                elif key == ord('c') and LEARNING_MODE:
+                    # Corriger la dernière détection
+                    if self.last_detection:
+                        corrected = self.handle_correction(
+                            self.last_frame,
+                            self.last_detection['class']
+                        )
+                        if corrected:
+                            # Sauvegarder en base de données
+                            bin_color = waste_classifier.ask_user_for_bin(corrected)
+                            if bin_color:
+                                waste_classifier.save_to_database(corrected, bin_color)
+                
+                # Commande textuelle pour stats
+                # (Note: ne fonctionne que si on redirige stdin, sinon utiliser 's' dans le menu)
         
         except KeyboardInterrupt:
             print("\n\n⚠ Interrompu par l'utilisateur")
@@ -449,11 +520,7 @@ class WasteDetector:
             if SHOW_DISPLAY:
                 cv2.destroyAllWindows()
             
-            if MAIN_SCRIPT_AVAILABLE:
-                if self.serial_conn:
-                    self.serial_conn.close()
-                if self.db_conn:
-                    self.db_conn.close()
+            waste_classifier.cleanup()
             
             print("\n✓ Système de détection arrêté\n")
 
