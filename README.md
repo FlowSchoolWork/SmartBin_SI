@@ -1,616 +1,372 @@
-# 🤖 Smart Bin SI - Système de Tri Intelligent des Déchets
+# 🤖 Smart Bin SI - Système Intelligent de Tri des Déchets
 
-> **Poubelle intelligente utilisant l'IA (YOLOv8) sur NVIDIA Jetson Nano pour le tri automatique des déchets.**
+> **Poubelle autonome utilisant l'Intelligence Artificielle (YOLOv8) pour le tri automatique et intelligent des déchets. Combinaison de vision par ordinateur, machine learning et électronique embarquée.**
 
-[![Python](https://img.shields.io/badge/Python-3.6+-blue.svg)](https://www.python.org/)
-[![Arduino](https://img.shields.io/badge/Arduino-Uno-00979D.svg)](https://www.arduino.cc/)
-[![YOLOv8](https://img.shields.io/badge/YOLO-v8-yellow.svg)](https://github.com/ultralytics/ultralytics)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-
----
-
-## 📋 Table des Matières
-
-- [Présentation](#-présentation)
-- [Démonstration](#-démonstration)
-- [Architecture](#-architecture)
-- [Matériel Requis](#️-matériel-requis)
-- [Installation](#-installation)
-- [Utilisation](#-utilisation)
-- [Configuration](#️-configuration)
-- [Dépannage](#-dépannage)
-- [Contribuer](#-contribuer)
+![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)
+![Arduino](https://img.shields.io/badge/Arduino-Uno-00979D.svg)
+![YOLO](https://img.shields.io/badge/YOLO-v8-yellow.svg)
+![License](https://img.shields.io/badge/License-MIT-green.svg)
 
 ---
 
-## 🎯 Présentation
+## 📚 Table des Matières
 
-Smart Bin SI est un **système de tri automatique de déchets** qui utilise :
-- 🧠 **Intelligence Artificielle** (YOLOv8) pour détecter les objets
-- 💾 **Base de données** SQLite pour mémoriser les classifications
-- 🤖 **Arduino** pour contrôler les servomoteurs
-- 📷 **Caméra** pour la détection temps réel
+1. [Présentation rapide](#présentation-rapide)
+2. [Démarrage rapide](#démarrage-rapide--quickstart)
+3. [Architecture du système](#architecture-du-système)
+4. [Installation complète](#installation-complète)
+5. [Utilisation](#utilisation)
+6. [Documentation détaillée](#documentation-détaillée)
+7. [Support & FAQ](#support--faq)
 
-### Fonctionnalités
+---
 
-✅ **Détection automatique** des déchets par caméra  
+## 🎯 Présentation Rapide
+
+### Qu'est-ce que Smart Bin SI ?
+
+Smart Bin SI est un **système de tri automatique de déchets** qui utilise l'intelligence artificielle pour trier correctement les déchets dans les bons bacs. Le système combine :
+
+- **📷 Vision par ordinateur** : détecte les objets via une caméra
+- **🧠 Apprentissage automatique** : apprend de chaque nouvelle détection
+- **💾 Intelligence persistante** : mémorise les classifications dans une base de données
+- **🤖 Automatisation complète** : tri automatisé via servomoteurs Arduino
+
+### ✨ Fonctionnalités principales
+
+✅ **Détection en temps réel** des déchets via caméra  
 ✅ **Classification intelligente** en 3 catégories :
-   - 🟡 **Jaune** : Recyclable (plastique, carton, métal, verre)
-   - 🟢 **Vert** : Organique (déchets alimentaires, biodégradable)
-   - 🟤 **Marron** : Déchets généraux (non recyclable)  
-✅ **Apprentissage automatique** : mémorise les nouveaux objets  
-✅ **Apprentissage au fur et à mesure** : quand tu confirmes une détection (« oui c’est correct »), l’image est sauvegardée pour réentraîner le modèle (voir [docs/APPENTISSAGE.md](docs/APPENTISSAGE.md))  
-✅ **Statistiques** : suivi des performances de tri  
-✅ **Deux modes** : automatique (YOLO + caméra) ou manuel (saisie texte)
+- 🟡 **Jaune** : Recyclable (plastique, carton, métal, verre)
+- 🟢 **Vert** : Organique/Compost (déchets alimentaires, biodégradable)
+- 🟤 **Marron** : Déchets généraux (non-recyclable)
+
+✅ **Apprentissage continu** : valide les détections et les enregistre  
+✅ **Base de données intelligente** : mémorise toutes les classifications  
+✅ **Deux modes d'opération** :
+- Mode automatique (détection par caméra + YOLO)
+- Mode manuel (saisie texte sans caméra)
+
+✅ **Tableau de bord web** : suivi en temps réel des détections et de l'état du système  
+✅ **Apprentissage incrémental** : améliore le modèle YOLO avec vos données
 
 ---
 
-## 🎬 Démonstration
+## 🚀 Démarrage Rapide (QuickStart)
 
-### Mode Automatique (détection + apprentissage)
-```bash
-cd src && python yolo_detector.py
-# ou depuis la racine : python -m src.yolo_detector
-```
-**Apprentissage** : à chaque détection validée (« y »), l’image est sauvegardée dans `data/training_images/<classe>/` pour améliorer le modèle plus tard. Voir [docs/APPENTISSAGE.md](docs/APPENTISSAGE.md).
-1. Place un déchet devant la caméra
-2. YOLO détecte l'objet (ex: "plastic_bottle")
-3. Le système vérifie en base de données
-4. La plateforme tourne vers le bon bac
-5. Le déchet est déposé automatiquement
-
-### Mode Manuel (sans caméra)
-```bash
-cd src && python waste_classifier.py
-```
-1. Entre le nom d'un objet (ex: "plastic_bottle") ou "stats" / "quit"
-2. Le système assigne ou récupère la couleur du bac (DB + mapping)
-3. L'Arduino effectue le tri
-
----
-
-## 🏗️ Architecture
-
-### Schéma Simplifié
-```
-┌──────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────┐
-│  Caméra  │────▶│     YOLO     │────▶│  DB Manager  │────▶│ Arduino  │
-│   USB    │     │  Détection   │     │   Logique    │     │  Servos  │
-└──────────┘     └──────────────┘     └──────────────┘     └──────────┘
-```
-
-### Les 3 Codes Principaux
-
-| Fichier | Langage | Rôle |
-|---------|---------|------|
-| `yolo_detector.py` | Python | 👁️ Détecte les objets via caméra |
-| `waste_classifier.py` | Python | 🧠 Gère la DB et décide la couleur |
-| `smart_bin_controller.ino` | C++ | 🤖 Contrôle les mouvements physiques |
-
-**Flux de données complet :**
-1. 📷 **Caméra** capture une image
-2. 🧠 **YOLO** détecte "plastic_bottle"
-3. 💾 **DB Manager** cherche → trouve "yellow"
-4. 📡 **Série USB** envoie "yellow" à l'Arduino
-5. ⚙️ **Arduino** fait tourner les servos
-6. 🗑️ **Déchet** tombe dans le bon bac
-
-> 📖 Pour une explication détaillée, voir [ARCHITECTURE.md](docs/ARCHITECTURE.md)
-
----
-
-## 🛠️ Matériel Requis
-
-### Électronique
-
-| Composant | Quantité | Prix ~€ | Lien |
-|-----------|----------|---------|------|
-| **NVIDIA Jetson Nano** | 1 | 100€ | [NVIDIA](https://www.nvidia.com/fr-fr/autonomous-machines/embedded-systems/jetson-nano/) |
-| **Arduino Uno** | 1 | 20€ | [Arduino](https://store.arduino.cc/products/arduino-uno-rev3) |
-| **Servo MG996R** | 2 | 10€/pièce | Amazon |
-| **Caméra USB** ou **CSI** | 1 | 15-30€ | Logitech C270 |
-| **Alimentation 5V/3A** | 1 | 10€ | Pour servos |
-| Câbles Dupont | - | 5€ | Connexions |
-
-**Budget total : ~180-200€**
-
-### Mécanique (à fabriquer)
-
-- Plateforme rotative (impression 3D ou bois)
-- Support pour servomoteurs
-- Rampe d'arrivée des déchets
-- 3 bacs de tri (jaune, vert, marron)
-
----
-
-## 📥 Installation
-
-### Méthode 1 : Installation Automatique (Recommandé)
+### Configuration minimale requise
 
 ```bash
-# 1. Cloner le projet
+# 1. Cloner ou télécharger le projet
 git clone https://github.com/sayfox8/SmartBin_SI.git
 cd SmartBin_SI
 
-# 2. Lancer l'installation automatique
-bash scripts/setup.sh
+# 2. Créer un environnement virtuel
+python -m venv .venv
 
-# 3. Déconnexion/Reconnexion (IMPORTANT pour permissions série)
-logout
+# 3. Activer l'environnement
+# Sur Windows :
+.venv\Scripts\activate
+# Sur Linux/Mac :
+source .venv/bin/activate
 
-# 4. Télécharger un modèle YOLO pré-entraîné
-python3 scripts/download_model.py
-# Choisis [1] YOLOv8n Waste (rapide)
+# 4. Installer les dépendances
+pip install -r requirements.txt
 
-# 5. Uploader le code Arduino
-# Ouvre Arduino IDE
-# Fichier > Ouvrir > arduino/smart_bin_controller.ino
-# Outils > Carte > Arduino Uno
-# Outils > Port > /dev/ttyACM0
-# Téléverser (→)
+# 5. Lancer le système en mode manuel (test sans caméra)
+python src/waste_classifier.py
 ```
 
-### Méthode 2 : Installation Manuelle
+**✓ Succès !** Vous verrez le prompt interactif :
+```
+🤖 SMART BIN SI - MODE MANUEL (sans caméra)
+Tape le nom d'un objet pour lancer le tri. 'stats' = statistiques, 'quit' = quitter.
 
-<details>
-<summary>Cliquer pour voir les étapes détaillées</summary>
-
-```bash
-# Mise à jour système
-sudo apt-get update && sudo apt-get upgrade -y
-
-# Installer dépendances système
-sudo apt-get install -y python3-pip python3-dev build-essential git
-
-# Installer PyTorch pour Jetson
-wget https://nvidia.box.com/shared/static/fjtbno0vpo676a25cgvuqc1wty0fkkg6.whl -O torch.whl
-pip3 install torch.whl
-rm torch.whl
-
-# Installer dépendances Python
-pip3 install pyserial opencv-python numpy Pillow ultralytics
-
-# Permissions série
-sudo usermod -a -G dialout $USER
-logout  # Puis reconnecte-toi
-
-# Créer structure
-mkdir -p SmartBin_SI/{src,arduino,models,data/logs}
-cd SmartBin_SI
+Objet > plastic_bottle
+✓ Tri vers bac yellow
 ```
 
-</details>
-
-### Vérification de l'Installation
-
-```bash
-# Tester les connexions matérielles
-python3 scripts/test_hardware.py
-```
-
-**Résultat attendu :**
-```
-[1] Checking Serial Ports...
-   ✓ Found 1 port(s): /dev/ttyACM0
-
-[2] Checking Camera...
-   ✓ Camera accessible at /dev/video0
-
-[3] Checking PyTorch...
-   ✓ PyTorch v1.10.0
-   ✓ CUDA available
-
-[4] Checking YOLOv8...
-   ✓ Ultralytics installed
-```
+> 👉 **Pour la configuration complète**, voir [docs/INSTALLATION.md](docs/INSTALLATION.md)
 
 ---
 
-## 🚀 Utilisation
+## 🏗️ Architecture du Système
 
-### Démarrage Rapide
+### Schéma Simplifié
 
-#### Mode Automatique (Détection YOLO)
-
-```bash
-python3 yolo_detector.py
+```
+┌──────────────────────────────────────────────────────────────┐
+│                      SMART BIN SI                            │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│  📷 Caméra USB  →  🧠 YOLO Detection  →  💾 DB Manager    │
+│                                              ↓              │
+│                                        Classification       │
+│                                              ↓              │
+│                                        Decision Logic       │
+│                                              ↓              │
+│                                     📡 Serial Commands      │
+│                                              ↓              │
+│                                   ⚙️ Arduino (Servos)     │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
 ```
 
-**Contrôles :**
-- `q` : Quitter
-- `s` : Forcer le tri de l'objet actuel
-- `r` : Réinitialiser le compteur de détections
+### Les Trois Briques Principales
 
-**Fenêtre de détection :**
-- Les boîtes de couleur indiquent le bac cible
-- Le compteur montre les détections consécutives (ex: 2/3)
-- FPS affiché en haut à gauche
+| Composant | Fichier | Rôle |
+|-----------|---------|------|
+| **Détection** | `src/yolo_detector.py` | 👁️ Capture vidéo et détecte les objets |
+| **Intelligence** | `src/waste_classifier.py` | 🧠 Décide la bonne couleur de bac |
+| **Contrôle Matériel** | `arduino/smart_bin_controller.ino` | 🤖 Actionne les servomoteurs |
 
-#### Mode Manuel (Sans Caméra)
+### Flux Complet de Données
+
+```
+1. 📷 Caméra capture une image
+   ↓
+2. 🧠 YOLO analyse → détecte "plastic_bottle" (confiance: 0.92)
+   ↓
+3. 💾 Base de données cherche "plastic_bottle"
+   ↓
+4. 🔍 Trouvé → "yellow" (ou demande confirmation)
+   ↓
+5. 📡 Envoie "yellow" via USB à l'Arduino
+   ↓
+6. ⚙️ Arduino fait tourner les servos vers le bac jaune
+   ↓
+7. 🗑️ L'objet tombe dans le bon bac
+   ↓
+8. 📊 Enregistrement dans la base de données pour l'apprentissage
+```
+
+> 📖 **Voir la documentation complète** : [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+
+---
+
+## 📦 Installation Complète
+
+Cette section couvre l'installation détaillée avec tous les prérequis.
+
+### Prérequis
+
+- **Python 3.8+** (3.10+ recommandé)
+- **pip** (gestionnaire de paquets Python)
+- **Câble USB** pour Arduino
+- **Caméra USB** (optionnel, pour mode automatique)
+- **Arduino Uno** ou compatible
+- **Système d'exploitation** : Windows, Linux, ou macOS
+
+### Étape 1 : Préparer l'Environnement
 
 ```bash
-python3 waste_classifier.py
+# Naviguer vers le répertoire du projet
+cd SmartBin_SI
+
+# Créer un environnement virtuel
+python -m venv .venv
+
+# Activer l'environnement
+# Windows :
+.venv\Scripts\activate
+# Linux / macOS :
+source .venv/bin/activate
+```
+
+### Étape 2 : Installer les Dépendances
+
+```bash
+# Mettre à jour pip
+python -m pip install --upgrade pip
+
+# Installer tous les paquets
+pip install -r requirements.txt
+```
+
+**Packages installés :**
+- `pyserial` : communication avec Arduino
+- `opencv-python` : traitement d'images
+- `numpy` : calculs matriciels
+- `Pillow` : manipulation d'images
+- `matplotlib` : visualisation
+- `pandas` : gestion de données
+
+### Étape 3 : Configuration Arduino
+
+```bash
+# Télécharger l'IDE Arduino
+# Ouvrir : arduino/smart_bin_controller.ino
+# Téléverser sur l'Arduino (Outils → Port COM approprié)
+```
+
+### Étape 4 : Configuration du Système
+
+Éditer [src/config.py](src/config.py) selon votre matériel :
+
+```python
+# Pour Windows
+ARDUINO_PORT = 'COM3'  # Vérifier dans le Gestionnaire des périphériques
+
+# Pour Linux/Mac
+ARDUINO_PORT = '/dev/ttyACM0'
+```
+
+> 📖 **Documentation détaillée** : [docs/INSTALLATION.md](docs/INSTALLATION.md)
+
+---
+
+## 💻 Utilisation
+
+### Mode Manuel (Sans Caméra)
+
+Perfect pour tester sans matériel :
+
+```bash
+cd src
+python waste_classifier.py
 ```
 
 **Commandes disponibles :**
-- `[nom objet]` : Trier un objet (ex: "plastic_bottle")
-- `stats` : Afficher les statistiques
-- `quit` : Quitter le programme
+- Entrer un nom d'objet (ex: `plastic_bottle`, `banana`)
+- `stats` → afficher les statistiques de classification
+- `quit` → quitter
 
-**Exemple de session :**
-```
-Objet détecté > plastic_bottle
-✓ Trouvé en base : plastic_bottle → bac yellow
-🎯 Action de tri : plastic_bottle → bac yellow
-→ Commande envoyée à l'Arduino : yellow
-⏳ Attente de la fin du tri (10s)...
-✓ Tri terminé
+### Mode Automatique (Avec Caméra)
 
-Objet détecté > stats
-
-📊 STATISTIQUES DE LA BASE DE DONNÉES
-Total d'objets appris : 12
-  Bac yellow   :   7 objets (  35 utilisations)
-  Bac green    :   3 objets (  12 utilisations)
-  Bac brown    :   2 objets (   8 utilisations)
-```
-
----
-
-## ⚙️ Configuration
-
-### Fichier config.py
-
-Tous les paramètres sont centralisés dans `src/config.py` :
-
-```python
-# Modèle YOLO à utiliser
-MODEL_NAME = "yolov8n_waste.pt"  # nano (rapide) ou yolov8s_waste.pt (précis)
-
-# Seuils de détection
-CONFIDENCE_THRESHOLD = 0.6  # 0.0 à 1.0 (plus haut = plus strict)
-MIN_DETECTIONS = 3          # Détections consécutives requises
-
-# Caméra
-CAMERA_SOURCE = 0           # 0 = USB, 1 = deuxième caméra
-USE_CSI_CAMERA = False      # True pour Raspberry Pi Camera
-
-# Arduino
-ARDUINO_PORT = "/dev/ttyACM0"  # Changer si différent
-BAUD_RATE = 9600
-
-# Mapping déchets → bacs (PERSONNALISER ICI)
-WASTE_TO_BIN_MAPPING = {
-    "plastic": "yellow",
-    "cardboard": "yellow",
-    "banana_peel": "green",
-    "tissue": "brown",
-    # Ajoute tes propres classes ici
-}
-```
-
-### Personnaliser le Mapping
-
-**Pour ajouter une nouvelle classe :**
-
-1. Édite `src/config.py`
-2. Ajoute dans `WASTE_TO_BIN_MAPPING` :
-   ```python
-   "aluminum_can": "yellow",
-   ```
-3. Redémarre le programme
-
-**Pour changer un mapping existant :**
-```python
-# Avant
-"plastic_bottle": "yellow",
-
-# Après (si tu veux le mettre ailleurs)
-"plastic_bottle": "brown",
-```
-
----
-
-## 🔧 Calibration Arduino
-
-### Ajuster les Angles des Servos
-
-Si les servos ne pointent pas vers les bons bacs :
-
-1. Ouvre `arduino/smart_bin_controller.ino`
-2. Modifie les constantes :
-
-```cpp
-// Angles d'orientation (rotation gauche/droite)
-const int ANGLE_BROWN = 30;    // ← Change ici
-const int ANGLE_YELLOW = 150;  // ← Change ici
-const int ANGLE_GREEN = 90;    // ← Change ici
-
-// Angles de vidage
-const int TILT_UP = 20;        // ← Bascule vers le haut
-const int TILT_DOWN = 160;     // ← Bascule vers le bas
-```
-
-3. Retéléverse sur l'Arduino
-4. Teste avec le mode manuel
-
-### Mode Calibration (Optionnel)
-
-Décommente dans le `.ino` :
-```cpp
-void loop() {
-  // Ajoute ceci pour tester tous les angles
-  if (Serial.available() > 0) {
-    String command = Serial.readStringUntil('\n');
-    if (command == "calibrate") {
-      calibrationMode();  // Teste tous les angles
-    }
-  }
-}
-```
-
----
-
-## 🐛 Dépannage
-
-### Problème : Arduino non détecté
-
-**Symptôme :** `Mode simulation (Arduino non détecté)`
-
-**Solutions :**
-```bash
-# 1. Vérifier les ports disponibles
-ls /dev/ttyACM* /dev/ttyUSB*
-
-# 2. Vérifier les permissions
-groups $USER  # Doit contenir "dialout"
-
-# 3. Ajouter aux permissions si absent
-sudo usermod -a -G dialout $USER
-logout  # Puis reconnecte-toi
-
-# 4. Tester manuellement
-python3 -c "import serial; s = serial.Serial('/dev/ttyACM0', 9600); print('OK')"
-```
-
-### Problème : Caméra non détectée
-
-**Symptôme :** `Échec d'ouverture de la caméra`
-
-**Solutions :**
-```bash
-# 1. Lister les caméras
-ls /dev/video*
-
-# 2. Tester avec v4l2
-v4l2-ctl --list-devices
-
-# 3. Tester OpenCV
-python3 -c "import cv2; cap = cv2.VideoCapture(0); print('OK' if cap.isOpened() else 'FAIL')"
-
-# 4. Changer CAMERA_SOURCE dans config.py
-CAMERA_SOURCE = 1  # Essayer 1 au lieu de 0
-```
-
-### Problème : Détection YOLO lente (< 5 FPS)
-
-**Solutions :**
-
-1. **Réduire la résolution** dans `config.py` :
-   ```python
-   FRAME_WIDTH = 416   # au lieu de 640
-   FRAME_HEIGHT = 416
-   ```
-
-2. **Utiliser un modèle plus léger** :
-   ```python
-   MODEL_NAME = "yolov8n_waste.pt"  # Nano = plus rapide
-   ```
-
-3. **Désactiver l'affichage** :
-   ```python
-   SHOW_DISPLAY = False
-   ```
-
-### Problème : Modèle pas assez précis
-
-**Solutions :**
-
-1. **Baisser le seuil de confiance** :
-   ```python
-   CONFIDENCE_THRESHOLD = 0.5  # au lieu de 0.6
-   ```
-
-2. **Utiliser un modèle plus gros** :
-   ```python
-   MODEL_NAME = "yolov8s_waste.pt"  # Small = plus précis
-   ```
-
-3. **Entraîner ton propre modèle** avec tes données
-
-### Problème : Mauvais tri (mauvais bac)
-
-**Causes possibles :**
-
-1. **Mapping incorrect** → Vérifie `WASTE_TO_BIN_MAPPING` dans `config.py`
-2. **Angles servos mal réglés** → Recalibre dans le `.ino`
-3. **Objet inconnu** → Ajoute-le manuellement en DB
-
----
-
-## 📊 Base de Données
-
-### Structure
-
-```sql
--- Table principale
-CREATE TABLE waste_classification (
-    item_name TEXT PRIMARY KEY,      -- "plastic_bottle"
-    bin_color TEXT NOT NULL,         -- "yellow"
-    created_at TIMESTAMP,            -- Date de création
-    usage_count INTEGER DEFAULT 1   -- Nombre d'utilisations
-);
-```
-
-### Commandes Utiles
+Utilise YOLO pour détecter les objets en temps réel :
 
 ```bash
-# Voir toutes les entrées
-sqlite3 data/waste_items.db "SELECT * FROM waste_classification;"
+cd src
+python yolo_detector.py
+```
 
-# Supprimer un objet
-sqlite3 data/waste_items.db "DELETE FROM waste_classification WHERE item_name='plastic_bottle';"
+**Actions pendant la détection :**
+- `y` → confirmer la détection (sauvegarde pour apprentissage)
+- `n` → rejeter la détection
+- `q` → quitter
 
-# Réinitialiser la DB
-rm data/waste_items.db
-python3 waste_classifier.py  # Recrée la DB
+### Interface Web (Tableau de Bord)
+
+Accéder au monitoring en temps réel :
+
+```bash
+cd admin_interface
+python app.py
+```
+
+Ouvrir le navigateur : **http://localhost:5000**
+
+> 📖 **Guide complet d'utilisation** : [docs/UTILISATION.md](docs/UTILISATION.md)
+
+---
+
+## 📖 Documentation Détaillée
+
+| Document | Contenu |
+|----------|---------|
+| [docs/INSTALLATION.md](docs/INSTALLATION.md) | Installation complète avec prérequis |
+| [docs/CONFIGURATION.md](docs/CONFIGURATION.md) | Configuration avancée du système |
+| [docs/UTILISATION.md](docs/UTILISATION.md) | Guide d'utilisation des modes |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Architecture technique détaillée |
+| [docs/APPENTISSAGE.md](docs/APPENTISSAGE.md) | Système d'apprentissage et d'amélioration |
+| [docs/ENTRAINEMENT_IA.md](docs/ENTRAINEMENT_IA.md) | Réentraînement du modèle YOLO |
+| [docs/DEPANNAGE.md](docs/DEPANNAGE.md) | Troubleshooting et solutions |
+
+---
+
+## 🆘 Support & FAQ
+
+### Problèmes Courants
+
+**Q : "Arduino non détecté"**  
+R : Vérifier le port COM dans `config.py` et installer les drivers CH340/FTDI si nécessaire.
+
+**Q : "CUDA not available"**  
+R : Normal si vous n'avez pas de GPU NVIDIA. PyTorch utilisera le CPU (plus lent).
+
+**Q : "Caméra non reconnue"**  
+R : Essayer `CAMERA_SOURCE = 1` dans `config.py` ou vérifier les permissions.
+
+> 📖 **FAQ complète** : [docs/DEPANNAGE.md](docs/DEPANNAGE.md)
+
+---
+
+## 📊 Structure du Projet
+
+```
+SmartBin_SI/
+├── src/                          # Code Python principal
+│   ├── config.py                # Configuration centralisée
+│   ├── yolo_detector.py         # Détection YOLO
+│   ├── waste_classifier.py      # Gestion base de données
+│   └── models/
+│       └── best.pt              # Modèle YOLO entraîné
+│
+├── admin_interface/             # Tableau de bord web
+│   ├── app.py                   # Application Flask
+│   ├── requirements.txt          # Dépendances admin
+│   └── static/
+│       ├── index.html
+│       ├── script.js
+│       └── style.css
+│
+├── arduino/                     # Code Arduino
+│   ├── smart_bin_controller.ino
+│   └── wokwi-project.txt        # Simulation Wokwi
+│
+├── docs/                        # Documentation
+│   ├── INSTALLATION.md
+│   ├── CONFIGURATION.md
+│   ├── UTILISATION.md
+│   ├── ARCHITECTURE.md
+│   ├── APPENTISSAGE.md
+│   ├── ENTRAINEMENT_IA.md
+│   └── DEPANNAGE.md
+│
+├── data/                        # Données du système
+│   ├── waste_items.db           # Base SQLite
+│   ├── training_images/         # Images pour apprentissage
+│   └── logs/                    # Fichiers journaux
+│
+└── requirements.txt             # Dépendances principales
 ```
 
 ---
 
-## 📈 Performances
+## 🎓 Apprentissage et Amélioration
 
-### Benchmarks (Jetson Nano)
+Smart Bin SI utilise un système d'apprentissage continu :
 
-| Modèle | Taille | FPS | Précision |
-|--------|--------|-----|-----------|
-| YOLOv8n | 6 MB | 18-22 | ~85% |
-| YOLOv8s | 22 MB | 10-14 | ~89% |
-| YOLOv8m | 50 MB | 4-7 | ~92% |
+1. **Détection** : YOLO propose une classification
+2. **Validation** : L'utilisateur confirme ou rejette
+3. **Enregistrement** : Les données sont sauvegardées
+4. **Apprentissage** : Réentraînement du modèle avec les nouvelles données
 
-### Optimisations
+Cela permet au système de s'améliorer progressivement !
 
-Pour améliorer les performances :
-
-1. **Convertir en TensorRT** (accélération Jetson) :
-   ```bash
-   python3 -c "from ultralytics import YOLO; YOLO('models/best.pt').export(format='engine')"
-   ```
-
-2. **Réduire la résolution d'entrée**
-
-3. **Désactiver l'affichage OpenCV**
+> 📖 **Guide complet** : [docs/APPENTISSAGE.md](docs/APPENTISSAGE.md)
 
 ---
 
-## 🎓 Entraîner Ton Propre Modèle
+## 📝 Licence
 
-> **Guide détaillé étape par étape (logiciels, app web Roboflow, où mettre quoi) : [docs/ENTRAINEMENT_IA.md](docs/ENTRAINEMENT_IA.md)**
-
-### Dataset Recommandés
-
-1. **TrashNet** (2527 images, 6 classes)
-   - https://github.com/garythung/trashnet
-
-2. **TACO** (1500+ images, 60+ classes)
-   - http://tacodataset.org/
-
-3. **Roboflow Waste** (5460 images)
-   - https://universe.roboflow.com/projectverba/yolo-waste-detection
-
-### Entraînement Rapide (Google Colab)
-
-```python
-# Dans un notebook Colab
-!git clone https://github.com/ultralytics/ultralytics
-%cd ultralytics
-!pip install -r requirements.txt
-
-# Télécharger ton dataset (Roboflow)
-from roboflow import Roboflow
-rf = Roboflow(api_key="TON_API_KEY")
-project = rf.workspace().project("TON_PROJET")
-dataset = project.version(1).download("yolov8")
-
-# Entraîner
-!yolo train model=yolov8n.pt data={dataset.location}/data.yaml epochs=100 imgsz=640
-
-# Télécharger best.pt vers ta Jetson
-```
+Ce projet est sous licence **MIT** - voir [LICENSE](LICENSE) pour les détails.
 
 ---
 
-## 🤝 Contribuer
+## 👥 Contributeurs
 
-Les contributions sont les bienvenues ! 
-
-### Comment contribuer
-
-1. Fork le projet
-2. Crée une branche (`git checkout -b feature/AmazingFeature`)
-3. Commit tes changements (`git commit -m 'Add some AmazingFeature'`)
-4. Push sur la branche (`git push origin feature/AmazingFeature`)
-5. Ouvre une Pull Request
-
-### Idées d'Améliorations
-
-- [ ] Interface graphique (GUI avec Tkinter)
-- [ ] Support multi-caméras
-- [ ] API REST pour contrôle à distance
-- [ ] Application mobile
-- [ ] Détection de niveau de remplissage des bacs
-- [ ] Système de notification (email/SMS)
-- [ ] Dashboard web avec statistiques
-- [ ] Support d'autres langues
+- **Auteur Principal** : Équipe SmartBin
+- **Contributions** : Améliorations bienvenues via Pull Requests
 
 ---
 
-## 📜 Licence
+## 📞 Contact & Ressources
 
-Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de détails.
-
----
-
-## 👥 Auteurs
-
-**Smart Bin SI Team**
-- Développement : [FlowCreativeStudio]
-- Contact : []
-- GitHub : [@sayfox8](https://github.com/sayfox8)
+- **Problèmes** : Ouvrir une [Issue GitHub](https://github.com/sayfox8/SmartBin_SI/issues)
+- **Documentation** : Voir le dossier [docs/](docs/)
+- **Site YOLO** : https://github.com/ultralytics/ultralytics
 
 ---
 
-## 🙏 Remerciements
-
-- [Ultralytics](https://github.com/ultralytics/ultralytics) pour YOLOv8
-- [NVIDIA](https://www.nvidia.com/) pour Jetson Nano
-- [Arduino](https://www.arduino.cc/) pour la plateforme
-- [Roboflow](https://roboflow.com/) pour les datasets
-
----
-
-## 📞 Support
-
-- **Documentation complète** : [ARCHITECTURE](ARCHITECTURE.md) [QUICK_START](QUICK_START.md)
-- **Issues GitHub** : [Créer un ticket](https://github.com/sayfox8/SmartBin_SI/issues)
-- **Email** : 
-
----
-
-## 🗺️ Roadmap
-
-### Version 1.0 ✅
-- [ ] Détection YOLO basique
-- [x] Contrôle Arduino
-- [x] Base de données SQLite
-
-### Version 2.0 🔄 (En cours)
-- [ ] Optimisation TensorRT
-- [ ] Interface graphique
-- [ ] Statistiques avancées
-
-### Version 3.0 📅 (Prévu)
-- [ ] Multi-caméras
-- [ ] API REST
-- [ ] Application mobile
-- [ ] Cloud sync
-
----
-
-<div align="center">
-
-**Fait avec ❤️ pour un monde plus propre 🌍♻️**
-
-[⬆ Retour en haut](#-smart-bin-si---système-de-tri-intelligent-des-déchets)
-
-</div>
+**Dernière mise à jour** : Février 2026  
+**Version** : 2.0 - Documentation Complète

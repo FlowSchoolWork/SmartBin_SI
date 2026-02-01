@@ -1,103 +1,535 @@
-# SmartBin - Interface Administrateur
+# 📊 Interface Web Admin - Smart Bin SI
 
-## 📋 Vue d'ensemble
+> **Tableau de bord complet pour superviser et gérer votre système Smart Bin SI en temps réel.**
 
-Interface administrative complète pour le système SmartBin. Permet de :
-- ✅ Visualiser l'état du système en temps réel (CPU, RAM, Disque)
-- ✅ Monitorer les GPU Nvidia (température, VRAM, utilisation)
-- ✅ Gérer les niveaux de remplissage des bacs
-- ✅ Lancer/arrêter les scripts de surveillance
-- ✅ Consulter les détections YOLO
-- ✅ Accéder à un bouton d'arrêt d'urgence
-- ✅ Éditer les paramètres (config.py)
-- ✅ Enregistrer les corrections d'erreurs IA
+**Dernière mise à jour** : Février 2026
 
-## 🎯 Fonctionnalités Implémentées
+---
 
-### Dashboard Principal (Accueil)
-- Vue d'ensemble du système avec infos temps réel
-- Infos du CPU (% utilisation, nb cores, fréquence)
-- Infos de la RAM (GB utilisés, % utilisation)
-- Infos du disque (GB libres, % utilisation)
-- Infos de l'uptime du système
-- Infos GPU Nvidia (modèle, température °C, VRAM, utilisation)
-- État des équipements (Caméra, Arduino)
-- Niveaux de remplissage des 3 bacs
-- Console des scripts en cours
-- Bouton d'arrêt d'urgence
+## 📋 Table des Matières
 
-### Gestion des Bacs
-- Affichage des 3 bacs (Recyclage, Compost, Général)
-- Visualisation des niveaux (%)
-- Statuts de chaque bac
+1. [Vue d'Ensemble](#vue-densemble)
+2. [Installation](#installation)
+3. [Lancement](#lancement)
+4. [Interface Utilisateur](#interface-utilisateur)
+5. [Fonctionnalités Principales](#fonctionnalités-principales)
+6. [API REST](#api-rest)
+7. [Troubleshooting](#troubleshooting)
 
-### Détections YOLO
-- Tableau des dernières détections
-- Confiance, classe, coordonnées
-- Timestamps
+---
 
-### Erreurs & Corrections
-- Enregistrement des erreurs signalées par les utilisateurs
-- Images attachées
-- Correction et enregistrement pour l'IA
+## 🎯 Vue d'Ensemble
 
-### Paramètres
-- Éditeur de config.py en temps réel
-- Mode maintenance
-- Activation/désactivation des fonctionnalités
+L'interface web admin est un **dashboard complet** permettant de :
+
+✅ **Superviser** le système en temps réel (CPU, RAM, GPU)  
+✅ **Gérer** les bacs de tri (vider, voir le remplissage)  
+✅ **Consulter** l'historique complet des détections  
+✅ **Surveiller** les erreurs et faux positifs  
+✅ **Configurer** les paramètres du système  
+✅ **Archiver** les données et les logs  
+✅ **Lancer/arrêter** les scripts en arrière-plan  
+
+### Caractéristiques
+
+- 📱 **Interface Responsive** : fonctionne sur desktop, tablette, mobile
+- 🔄 **Temps Réel** : mise à jour automatique des données
+- 📊 **Graphiques** : visualisation des statistiques
+- 🔐 **Légère** : pas de base de données supplémentaire
+- ⚡ **Rapide** : chargement < 1 sec
+
+---
 
 ## 📦 Installation
 
 ### Prérequis
-- Python 3.7+
-- pip
 
-### Étapes d'installation
+- **Python 3.7+**
+- **pip** installé
+- **Flask** pour l'application web
+- **psutil** pour le monitoring système (optionnel mais recommandé)
+- Navigateur web moderne (Chrome, Firefox, Safari, Edge)
 
-1. **Accéder au répertoire**
+### Étape 1 : Accéder au Répertoire
+
 ```bash
 cd z:\SI\SIpoubelle\admin_interface
+# Ou
+cd ~/SmartBin_SI/admin_interface
 ```
 
-2. **Installer les dépendances**
-```bash
-pip install -r requirements.txt
-```
+### Étape 2 : Installer les Dépendances
 
-Si vous avez une carte GPU Nvidia :
 ```bash
+# Installer Flask
+pip install Flask
+
+# Installer psutil pour le monitoring
+pip install psutil
+
+# (Optionnel) GPU monitoring NVIDIA
 pip install nvidia-ml-py3
 ```
 
-## 🚀 Exécution de l'Application
-
-### Démarrer le serveur Flask
+**Ou installer tout en une seule commande** :
 
 ```bash
-python app.py
+pip install Flask psutil nvidia-ml-py3
 ```
 
-Vous verrez un résultat comme :
+### Étape 3 : Configuration (Optionnel)
+
+Les fichiers de configuration se trouvent dans `static/config.js`.
+
+---
+
+## 🚀 Lancement
+
+### Démarrer l'Application
+
+```bash
+# Méthode 1 : Lancement simple
+python app.py
+
+# Méthode 2 : Avec logs en fichier
+python app.py > logs/admin.log 2>&1
+
+# Méthode 3 : En arrière-plan (Linux/macOS)
+nohup python app.py > logs/admin.log 2>&1 &
+
+# Méthode 4 : Mode debug (développement)
+python app.py --debug
+```
+
+### Affichage au Lancement
+
 ```
  * Serving Flask app 'app'
  * Debug mode: on
  * Running on http://127.0.0.1:5000
+ * Press CTRL+C to quit
 ```
 
-## 🌐 Accès à l'Interface
+### Accès à l'Interface
 
-### Via navigateur local
-1. Ouvrez votre navigateur web
-2. Allez à l'adresse : **http://127.0.0.1:5000** ou **http://localhost:5000**
+**Depuis la même machine** :
+```
+http://localhost:5000
+ou
+http://127.0.0.1:5000
+```
 
-### Via autre ordinateur du réseau (même réseau)
-1. Trouvez l'IP locale de votre machine :
-   ```bash
-   ipconfig
-   ```
-   Cherchez l'adresse IPv4 (ex: 192.168.1.100)
+**Depuis un autre ordinateur du réseau** :
+```
+# Trouver votre IP locale
+ipconfig  # Windows
+ifconfig  # Linux/macOS
 
-2. Accédez à : **http://<VOTRE_IP>:5000** (ex: http://192.168.1.100:5000)
+# Puis accéder à :
+http://192.168.1.X:5000
+```
+
+---
+
+## 🎨 Interface Utilisateur
+
+### 1. Accueil (Dashboard Principal)
+
+```
+┌─────────────────────────────────────────┐
+│           SMART BIN - ADMIN             │
+├─────────────────────────────────────────┤
+│                                         │
+│  📊 SYSTÈME (Temps réel)                │
+│  ├─ CPU : 45% (4 cores @ 2.4 GHz)     │
+│  ├─ RAM : 3.2 / 8 GB (40%)            │
+│  ├─ DISQUE : 125 / 500 GB (25%)       │
+│  ├─ UPTIME : 7j 14h 32m               │
+│  └─ GPU : NVIDIA RTX2060, 52°C        │
+│                                         │
+│  🔌 ÉQUIPEMENTS                        │
+│  ├─ Caméra : ✅ Connectée             │
+│  └─ Arduino : ✅ Connecté (COM3)      │
+│                                         │
+│  🗑️  BACS                              │
+│  ├─ Jaune (Recyclage)   : 65% ████     │
+│  ├─ Vert (Compost)      : 32% ██       │
+│  └─ Marron (Reste)      : 78% █████    │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+### 2. Gestion des Bacs
+
+```
+┌─────────────────────────────────────────┐
+│         GESTION DES BACS                │
+├─────────────────────────────────────────┤
+│                                         │
+│  BAC JAUNE (Recyclage)                  │
+│  ├─ Remplissage    : 65%               │
+│  ├─ Items          : 145               │
+│  ├─ Dernière vidange : 2026-02-01      │
+│  ├─ Capacité       : 10 L              │
+│  └─ [VIDER]  [RÉINITIALISER]           │
+│                                         │
+│  BAC VERT (Compost)                     │
+│  ├─ Remplissage    : 32%               │
+│  ├─ Items          : 87                │
+│  ├─ Dernière vidange : 2026-01-30      │
+│  ├─ Capacité       : 10 L              │
+│  └─ [VIDER]  [RÉINITIALISER]           │
+│                                         │
+│  BAC MARRON (Reste)                     │
+│  ├─ Remplissage    : 78%               │
+│  ├─ Items          : 203               │
+│  ├─ Dernière vidange : 2026-01-28      │
+│  ├─ Capacité       : 10 L              │
+│  └─ [VIDER]  [RÉINITIALISER]           │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+### 3. Historique des Détections
+
+```
+┌─────────────────────────────────────────┐
+│     DERNIÈRES DÉTECTIONS                │
+├─────────────────────────────────────────┤
+│                                         │
+│ Heure      | Objet          | Bac    │ │
+│─────────────────────────────────────────│
+│ 11:42:15   | plastic_bottle | yellow │ │
+│ 11:40:33   | banana         | green  │ │
+│ 11:38:22   | cardboard_box  | yellow │ │
+│ 11:36:45   | glass_jar      | yellow │ │
+│ 11:34:10   | food_waste     | green  │ │
+│                                         │
+│ [← Précédent]  [Suivant →]              │
+│ Page 1 de 287                           │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+### 4. Graphiques et Statistiques
+
+```
+Tri par Bac (Dernier mois)
+  Jaune  : ▓▓▓▓▓▓▓▓░░ 65% (1523 objets)
+  Vert   : ▓▓▓░░░░░░ 32% (745 objets)
+  Marron : ▓▓▓▓▓▓▓░░ 56% (1289 objets)
+
+Objets Détectés (Top 10)
+  plastic_bottle     : 287 fois
+  cardboard          : 156 fois
+  banana_peel        : 134 fois
+  glass_jar          : 98 fois
+  ...
+```
+
+### 5. Paramètres
+
+```
+┌─────────────────────────────────────────┐
+│       PARAMÈTRES DE CONFIG              │
+├─────────────────────────────────────────┤
+│                                         │
+│ Mode Apprentissage      : [ON]  [OFF]   │
+│ Sauvegarde Images       : [ON]  [OFF]   │
+│ Afficher L'interface    : [ON]  [OFF]   │
+│ Seuil Confiance YOLO    : [0.6]  +-     │
+│                                         │
+│ Port Arduino            : [COM3]        │
+│ Caméra Source           : [0]           │
+│ Vitesse Baudrate        : [9600]        │
+│                                         │
+│ [SAUVEGARDER]  [ANNULER]  [RESET]      │
+│                                         │
+└─────────────────────────────────────────┘
+```
+
+---
+
+## ⚙️ Fonctionnalités Principales
+
+### 1. Dashboard Système
+
+**Affichage en temps réel :**
+- CPU : usage %, nombre de cores, fréquence
+- RAM : GB utilisés, pourcentage
+- DISQUE : espace libre, pourcentage
+- UPTIME : temps depuis le démarrage
+- GPU NVIDIA : modèle, température, VRAM utilisation
+
+**Mise à jour** : Automatique chaque 2 secondes
+
+### 2. Gestion des Bacs
+
+**Actions disponibles :**
+- 🗑️ Vider un bac → Reset remplissage à 0%
+- 📊 Consulter l'état → Affiche détails
+- ⚡ Vidage d'urgence → Immédiat
+
+**Données affichées :**
+- Pourcentage de remplissage
+- Nombre d'items comptabilisés
+- Dernière vidange (date/heure)
+- Capacité maximale en litres
+
+### 3. Historique des Détections
+
+**Informations par détection :**
+- ⏰ Timestamp précis
+- 📦 Nom de l'objet
+- 🎯 Bac de destination
+- 📈 Confiance YOLO
+
+**Filtres disponibles :**
+- Par date/plage
+- Par bac
+- Par objet
+- Par confiance min
+
+**Exports :**
+- CSV pour Excel
+- JSON pour API externe
+- PDF pour rapport
+
+### 4. Gestion des Erreurs
+
+**Suivi des faux positifs :**
+- Affiche les détections rejetées
+- Permet d'enregistrer les corrections
+- Images attachées pour réentraînement
+
+### 5. Configuration Temps Réel
+
+**Édition directe des paramètres :**
+- Seuil de confiance YOLO
+- Mode apprentissage ON/OFF
+- Sauvegarde images ON/OFF
+- Port Arduino
+- Caméra source
+- Vitesse baudrate
+
+⚠️ **Important** : Les changements s'appliquent immédiatement
+
+### 6. Logs et Diagnostiques
+
+**Consultables via l'interface :**
+- Logs système (data/logs/system.log)
+- Logs erreurs (data/logs/errors.log)
+- Logs détections (data/logs/detections.log)
+
+**Téléchargement :**
+- Logs complets
+- Filtrage par date
+- Recherche par mot-clé
+
+---
+
+## 🔌 API REST
+
+### Points de Terminaison (Endpoints)
+
+#### GET /api/status
+**Récupère l'état du système**
+
+```json
+{
+  "cpu": { "usage": 45, "cores": 4, "freq": 2.4 },
+  "ram": { "used": 3.2, "total": 8, "percent": 40 },
+  "disk": { "free": 125, "total": 500, "percent": 25 },
+  "uptime": "7d 14h 32m",
+  "gpu": { "model": "RTX2060", "temp": 52, "vram": 60 },
+  "camera": true,
+  "arduino": true
+}
+```
+
+#### GET /api/bins
+**État de tous les bacs**
+
+```json
+{
+  "yellow": {
+    "fill_level": 65,
+    "item_count": 145,
+    "last_emptied": "2026-02-01",
+    "capacity": 10
+  },
+  "green": { ... },
+  "brown": { ... }
+}
+```
+
+#### GET /api/detections
+**Historique des détections**
+
+```json
+[
+  {
+    "timestamp": "2026-02-01 11:42:15",
+    "item": "plastic_bottle",
+    "bin": "yellow",
+    "confidence": 0.92
+  },
+  ...
+]
+```
+
+#### POST /api/bins/empty/{color}
+**Vider un bac**
+
+```bash
+curl -X POST http://localhost:5000/api/bins/empty/yellow
+```
+
+#### GET /api/settings
+**Récupère la configuration**
+
+```json
+{
+  "learning_mode": true,
+  "save_images": true,
+  "confidence_threshold": 0.6,
+  "arduino_port": "COM3"
+}
+```
+
+#### POST /api/settings
+**Modifie la configuration**
+
+```bash
+curl -X POST http://localhost:5000/api/settings \
+  -H "Content-Type: application/json" \
+  -d '{"confidence_threshold": 0.7}'
+```
+
+---
+
+## 🔧 Troubleshooting
+
+### Problème : Port 5000 déjà utilisé
+
+**Symptôme** :
+```
+OSError: [Errno 48] Address already in use
+```
+
+**Solution** :
+
+```bash
+# Option 1 : Utiliser un autre port
+python app.py --port 5001
+
+# Option 2 : Tuer le processus existant
+# Windows :
+netstat -ano | findstr :5000
+taskkill /PID [PID] /F
+
+# Linux/macOS :
+lsof -i :5000
+kill -9 [PID]
+```
+
+### Problème : Connexion refusée
+
+**Symptôme** :
+```
+refused to connect
+ERR_CONNECTION_REFUSED
+```
+
+**Cause** : Application n'est pas lancée
+
+**Solution** :
+```bash
+# Vérifier que l'app est bien lancée
+python app.py
+
+# Vérifier que vous accédez au bon port
+http://localhost:5000  ✓
+http://localhost:5001  ✗
+```
+
+### Problème : Les données ne se mettent pas à jour
+
+**Symptôme** :
+```
+Interface statique, pas de changement
+```
+
+**Cause** : JavaScript désactivé ou erreur réseau
+
+**Solution** :
+1. Vérifier que JavaScript est activé (F12 → Console)
+2. Vérifier que la base de données n'est pas verrouillée
+3. Redémarrer l'application
+
+### Problème : GPU not detected
+
+**Symptôme** :
+```
+GPU: N/A ou Not Available
+```
+
+**Solution** :
+
+```bash
+# Installer les drivers NVIDIA
+# Puis installer :
+pip install nvidia-ml-py3
+
+# Redémarrer l'app
+python app.py
+```
+
+---
+
+## 📊 Exemples d'Utilisation
+
+### Cas 1 : Supervision d'une Session de Tri
+
+```
+1. Ouvrir http://localhost:5000
+2. Observer le dashboard
+3. Voir les détections en direct
+4. Vérifier que les bacs se remplissent correctement
+5. Analyser les statistiques à la fin
+```
+
+### Cas 2 : Maintenance Préventive
+
+```
+1. Chaque semaine, consulter l'interface
+2. Vider les bacs si > 70% de remplissage
+3. Vérifier les performances (CPU, GPU)
+4. Télécharger les logs pour analyse
+```
+
+### Cas 3 : Analyser un Faux Positif
+
+```
+1. Consulter l'historique des détections
+2. Trouver la détection erronée
+3. Noter l'image et l'heure
+4. Intégrer cette donnée au réentraînement
+```
+
+---
+
+## 📞 Support
+
+**Problème** : Voir [docs/DEPANNAGE.md](../docs/DEPANNAGE.md)  
+**Améliorations** : Ouvrir une issue GitHub  
+**Questions** : Consulter la [documentation principale](../README.md)
+
+---
+
+**Version** : 1.0  
+**Dernière mise à jour** : Février 2026
+
 
 ## 📊 APIs Disponibles
 

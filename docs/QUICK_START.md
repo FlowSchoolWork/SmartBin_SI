@@ -1,52 +1,91 @@
-# 🚀 Quick Start - Smart Bin SI
+# ⚡ Démarrage Rapide (5 minutes) - Smart Bin SI
 
-## 📋 Vue d'Ensemble Rapide
-
-**Temps total : ~30 minutes**
-
-```
-Installation (15 min) → Téléchargement Modèle (5 min) → Test (5 min) → Utilisation (5 min)
-```
+> **La version ultra-rapide pour ceux qui sont pressés !**
 
 ---
 
-## ⚡ Installation Ultra-Rapide
-
-### 1️⃣ Cloner/Créer le Projet (1 min)
+## 🚀 Installation Express (2 minutes)
 
 ```bash
-# Si tu as déjà les fichiers
+# 1. Récupérer le projet
+git clone https://github.com/sayfox8/SmartBin_SI.git
 cd SmartBin_SI
 
-# OU créer de zéro
-mkdir SmartBin_SI && cd SmartBin_SI
-```
+# 2. Installer
+python -m venv .venv
+.venv\Scripts\activate  # Windows
+# OU
+source .venv/bin/activate  # Linux/Mac
 
-### 2️⃣ Lancer l'Installation Automatique (15 min)
+# 3. Dépendances
+pip install -r requirements.txt
 
-```bash
-# Rendre le script exécutable
-chmod +x scripts/setup.sh
-
-# Lancer l'installation
-bash scripts/setup.sh
-```
-
-☕ **Pause café pendant que ça installe...**
-
-### 3️⃣ Déconnexion/Reconnexion (IMPORTANT!)
-
-```bash
-# Pour appliquer les permissions série
-logout
-# Puis reconnecte-toi
+# C'est fait !
 ```
 
 ---
 
-## 🧠 Télécharger un Modèle Pré-entraîné (5 min)
+## ⏱️ Première Utilisation (3 minutes)
 
-### Option A : Modèle Léger (Recommandé pour débuter)
+### Mode Manuel (Sans Caméra) - FACILE
+
+```bash
+python src/waste_classifier.py
+```
+
+**Testez :**
+```
+Objet > plastic_bottle
+✓ Tri vers bac yellow
+
+Objet > banana
+✓ Tri vers bac green
+
+Objet > quit
+```
+
+### Mode Automatique (Avec Caméra) - PLUS COMPLET
+
+```bash
+python src/yolo_detector.py
+```
+
+Placez un objet devant la caméra → YOLO détecte → `y` pour confirmer
+
+---
+
+## 📋 Prérequis Minimum
+
+- Python 3.8+
+- pip
+- (Optionnel) Arduino + caméra USB
+
+---
+
+## ❓ Problèmes ?
+
+| Problème | Solution |
+|----------|----------|
+| "Python not found" | Réinstaller Python, cocher "Add to PATH" |
+| "ModuleNotFoundError" | `pip install -r requirements.txt` |
+| Arduino non détecté | Normal en mode simulation |
+| Caméra ne marche pas | Essayer `CAMERA_SOURCE = 1` dans config.py |
+
+> 📖 **Voir** [DEPANNAGE.md](DEPANNAGE.md)
+
+---
+
+## 📚 Prochaines Étapes
+
+1. **Lire** [README.md](../README.md) pour la vue d'ensemble
+2. **Consulter** [INSTALLATION.md](INSTALLATION.md) pour l'installation complète
+3. **Apprendre** [UTILISATION.md](UTILISATION.md) pour les modes
+4. **Configurer** [CONFIGURATION.md](CONFIGURATION.md) si besoin
+5. **Comprendre** [ARCHITECTURE.md](ARCHITECTURE.md) pour le tech
+
+---
+
+**Vous êtes prêt ! Bon tri ! 🗑️**
 
 ```bash
 python3 scripts/download_model.py

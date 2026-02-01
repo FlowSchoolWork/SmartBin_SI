@@ -1,52 +1,130 @@
-# 🏗️ Architecture Smart Bin SI - Explications Détaillées
+# 🏗️ Architecture Complète - Smart Bin SI
 
-## 📊 Vue d'Ensemble du Système
+> Explication détaillée de l'architecture technique du système de tri intelligent.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                      SMART BIN SI                               │
-│                                                                 │
-│  [Caméra USB] ──▶ [YOLO] ──▶ [DB Manager] ──▶ [Arduino]       │
-│                     │            │                │             │
-│                Detection    Base de         Contrôle           │
-│                Objet        Données          Servos            │
-└─────────────────────────────────────────────────────────────────┘
-```
+**Dernière mise à jour** : Février 2026
 
 ---
 
-## 🎬 LES 3 CODES PRINCIPAUX
+## 📋 Table des Matières
 
-### 1️⃣ **yolo_detector.py** - Détection par Caméra
-**Rôle :** Capture les images et détecte les objets
+1. [Vue d'Ensemble](#vue-densemble)
+2. [Stack Technologique](#stack-technologique)
+3. [Flux de Données](#flux-de-données)
+4. [Composants Principaux](#composants-principaux)
+5. [Communication Série](#communication-série)
+6. [Base de Données](#base-de-données)
+7. [Système d'Apprentissage](#système-dapprentissage)
+
+---
+
+## 🎯 Vue d'Ensemble
+
+Smart Bin SI est bâti sur une **architecture modulaire** composée de trois couches :
 
 ```
-┌──────────────────────────────────────┐
-│     YOLO DETECTOR                    │
-├──────────────────────────────────────┤
-│                                      │
-│  📷 Caméra                           │
-│   │                                  │
-│   ▼                                  │
-│  🖼️ Capture Frame                    │
-│   │                                  │
-│   ▼                                  │
-│  🧠 YOLO Inference                   │
-│   │                                  │
-│   ▼                                  │
-│  🎯 Détection                        │
-│     ├─ Classe: "plastic_bottle"     │
-│     ├─ Confiance: 0.92              │
-│     └─ BBox: [x, y, w, h]           │
-│   │                                  │
-│   ▼                                  │
-│  ✅ Si confiance > seuil             │
-│   │                                  │
-│   ▼                                  │
-│  📤 Envoie "plastic_bottle"          │
-│      vers DB Manager                 │
-│                                      │
-└──────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────┐
+│                   COUCHE PRÉSENTATION                    │
+│          Interface Web (Flask) + CLI (Python)            │
+├─────────────────────────────────────────────────────────┤
+│                  COUCHE MÉTIER                          │
+│      Détection YOLO + Gestion Classification             │
+├─────────────────────────────────────────────────────────┤
+│                 COUCHE INTÉGRATION                       │
+│      SQLite DB + Communication Série (Arduino)           │
+├─────────────────────────────────────────────────────────┤
+│                   COUCHE MATÉRIELLE                      │
+│       Caméra USB + Arduino + Servomoteurs                │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Principes Architecturaux
+
+1. **Modularité** : Chaque composant indépendant et testable
+2. **Résilience** : Le système fonctionne en mode simulation sans Arduino
+3. **Scalabilité** : Facilement extensible avec nouveaux bacs/capteurs
+4. **Performance** : Optimisé pour temps réel avec CPU/GPU
+
+---
+
+## 🛠️ Stack Technologique
+
+### Backend
+
+| Technologie | Version | Rôle |
+|-------------|---------|------|
+| **Python** | 3.8+ | Langage principal |
+| **PyTorch** | 1.9+ | Framework Deep Learning |
+| **OpenCV** | 4.5+ | Traitement d'images |
+| **PySerial** | 3.5+ | Communication série |
+| **SQLite3** | 3.35+ | Base de données |
+| **Flask** | 2.0+ | Interface web |
+
+### Frontend
+
+| Technologie | Usage |
+|-------------|-------|
+| **HTML5** | Structure interface web |
+| **CSS3** | Styling responsive |
+| **JavaScript** | Interactions UI |
+
+### Matériel
+
+| Composant | Spécifications |
+|-----------|---|
+| **Caméra** | USB 2.0, 30fps min, 640x480 min |
+| **Arduino** | Uno, Mega, or Clone (ATmega328P) |
+| **Servos** | SG90 ou MG996R, 5V, Contrôle PWM |
+| **Processeur** | CPU x86 ou ARM (Jetson Nano compatible) |
+
+---
+
+## 📊 Flux de Données
+
+### Flux 1 : Mode Automatique (Détection YOLO)
+
+```
+[Caméra USB]
+     ↓
+[OpenCV Capture]
+     ↓
+[YOLO Inference]  ← PyTorch model (best.pt)
+     ↓
+[Detection Result] {objet, confiance}
+     ↓
+[Lookup DB] ← SQLite
+     ↓
+[Get Bin Color]
+     ↓
+[Send Command] → Serial Arduino
+     ↓
+[Arduino Execute] → Servo Movement
+     ↓
+[Log Detection] ← Database
+```
+
+### Flux 2 : Mode Manuel
+
+```
+[User Input] → [Text Parser] → [DB Lookup]
+     ↓
+[Object Found?]
+├─ YES → [Get Color] → [Send Command]
+└─ NO → [Ask User] → [Save to DB] → [Send Command]
+     ↓
+[Arduino Execute] → [Log to DB]
+```
+
+### Flux 3 : Apprentissage
+
+```
+[Detection Confirmed]
+     ↓
+[Save Training Image]
+     ↓
+[Update DB]
+     ↓
+[Accumulate Data for Retraining]
 ```
 
 **Commandes :**
