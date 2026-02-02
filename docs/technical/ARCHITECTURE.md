@@ -24,17 +24,17 @@ Smart Bin SI est bâti sur une **architecture modulaire** composée de trois cou
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                   COUCHE PRÉSENTATION                    │
-│          Interface Web (Flask) + CLI (Python)            │
+│                   COUCHE PRÉSENTATION                   │
+│          Interface Web (Flask) + CLI (Python)           │
 ├─────────────────────────────────────────────────────────┤
 │                  COUCHE MÉTIER                          │
-│      Détection YOLO + Gestion Classification             │
+│      Détection YOLO + Gestion Classification            │
 ├─────────────────────────────────────────────────────────┤
-│                 COUCHE INTÉGRATION                       │
-│      SQLite DB + Communication Série (Arduino)           │
+│                 COUCHE INTÉGRATION                      │
+│      SQLite DB + Communication Série (Arduino)          │
 ├─────────────────────────────────────────────────────────┤
-│                   COUCHE MATÉRIELLE                      │
-│       Caméra USB + Arduino + Servomoteurs                │
+│                   COUCHE MATÉRIELLE                     │
+│       Caméra USB + Arduino + Servomoteurs               │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -156,36 +156,36 @@ python3 yolo_detector.py
 │     DB MANAGER (waste_classifier.py)       │
 ├────────────────────────────────────────────┤
 │                                            │
-│  📥 Reçoit: "plastic_bottle"               │
+│  📥 Reçoit: "plastic_bottle" 📥           │
 │   │                                        │
 │   ▼                                        │
-│  🔍 Cherche en Base de Données             │
+│  🔍 Cherche en Base de Données 🔍         │
 │   │                                        │
-│   ├─ ✅ Trouvé ?                           │
+│   ├─ ✅ Trouvé ? ✅                       │
 │   │   │                                    │
 │   │   ▼                                    │
-│   │  📊 waste_items.db                     │
-│   │   ┌─────────────────────────────┐     │
-│   │   │ plastic_bottle | yellow     │     │
-│   │   │ cardboard      | yellow     │     │
-│   │   │ banana_peel    | green      │     │
-│   │   └─────────────────────────────┘     │
+│   │  📊 waste_items.db 📊                 │
+│   │   ┌─────────────────────────────┐      │
+│   │   │ plastic_bottle | yellow     │      │
+│   │   │ cardboard      | yellow     │      │
+│   │   │ banana_peel    | green      │      │
+│   │   └─────────────────────────────┘      │
 │   │   │                                    │
 │   │   ▼                                    │
-│   │  ✅ Retourne "yellow"                  │
+│   │  ✅ Retourne "yellow" ✅              │
 │   │                                        │
-│   └─ ❌ Pas trouvé ?                       │
+│   └─ ❌ Pas trouvé ? ❌                   │
 │       │                                    │
 │       ▼                                    │
-│      🙋 Demande à l'utilisateur            │
+│      🙋 Demande à l'utilisateur 🙋        │
 │         "Dans quel bac ?"                  │
 │       │                                    │
 │       ▼                                    │
-│      💾 Sauvegarde en DB                   │
+│      💾 Sauvegarde en DB 💾               │
 │         plastic_bottle → yellow            │
 │   │                                        │
 │   ▼                                        │
-│  📤 Envoie "yellow" à Arduino              │
+│  📤 Envoie "yellow" à Arduino 📤          │
 │                                            │
 └────────────────────────────────────────────┘
 ```
@@ -229,36 +229,36 @@ CREATE TABLE waste_classification (
 │     ARDUINO CONTROLLER                      │
 ├─────────────────────────────────────────────┤
 │                                             │
-│  📥 Reçoit: "yellow\n"                      │
+│  📥 Reçoit: "yellow\n" 📥                  │
 │   │                                         │
 │   ▼                                         │
-│  🎯 Décode la commande                      │
+│  🎯 Décode la commande 🎯                  │
 │   │                                         │
-│   ├─ yellow → 150° rotation, bascule HAUT  │
-│   ├─ green  → 90°  rotation, bascule BAS   │
-│   └─ brown  → 30°  rotation, bascule HAUT  │
-│   │                                         │
-│   ▼                                         │
-│  ⚙️ SÉQUENCE DE TRI                         │
-│   │                                         │
-│   ├─ PHASE 1: ROTATION                     │
-│   │   Servo orientation → 150°             │
-│   │   Délai 1000ms                         │
-│   │                                         │
-│   ├─ PHASE 2: VIDAGE                       │
-│   │   Servo bascule → 20° (HAUT)           │
-│   │   Délai 600ms                          │
-│   │                                         │
-│   ├─ PHASE 3: VIBRATION (4x)               │
-│   │   Bascule 20° → 40° → 20°              │
-│   │   Délai 150ms entre chaque             │
-│   │                                         │
-│   └─ PHASE 4: RETOUR                       │
-│       Servo bascule → 90°                  │
-│       Servo rotation → 90°                 │
+│   ├─ yellow → 150° rotation, bascule HAUT   │
+│   ├─ green  → 90°  rotation, bascule BAS    │
+│   └─ brown  → 30°  rotation, bascule HAUT   │
 │   │                                         │
 │   ▼                                         │
-│  ✅ Envoie "✓ Termine"                      │
+│  ⚙️ SÉQUENCE DE TRI ⚙️                     │
+│   │                                         │
+│   ├─ PHASE 1: ROTATION                      │
+│   │   Servo orientation → 150°              │
+│   │   Délai 1000ms                          │
+│   │                                         │
+│   ├─ PHASE 2: VIDAGE                        │
+│   │   Servo bascule → 20° (HAUT)            │
+│   │   Délai 600ms                           │
+│   │                                         │
+│   ├─ PHASE 3: VIBRATION (4x)                │
+│   │   Bascule 20° → 40° → 20°               │
+│   │   Délai 150ms entre chaque              │
+│   │                                         │
+│   └─ PHASE 4: RETOUR                        │
+│       Servo bascule → 90°                   │
+│       Servo rotation → 90°                  │
+│   │                                         │
+│   ▼                                         │
+│  ✅ Envoie "✅ Termine"                    │
 │                                             │
 └─────────────────────────────────────────────┘
 ```
@@ -310,11 +310,11 @@ Servos MG996R
 ┌─────────────────────────────────────────────────────┐
 │  yolo_detector.py                                   │
 │  -------------------------------------------------- │
-│  📷 Frame capturée                                  │
-│  🧠 YOLO inference                                  │
-│  🎯 Détection: plastic_bottle (conf: 0.92)          │
-│  ✅ 3 détections consécutives → valide              │
-│  📤 Envoie "plastic_bottle" au DB Manager           │
+│  📷 Frame capturée 📷                              │
+│  🧠 YOLO inference 🧠                              │
+│  🎯 Détection: plastic_bottle (conf: 0.92) 🎯      │
+│  ✅ 3 détections consécutives → valide ✅          │
+│  📤 Envoie "plastic_bottle" au DB Manager 📤       │
 └──────┬──────────────────────────────────────────────┘
        │
        ▼
@@ -326,11 +326,11 @@ Servos MG996R
 ┌─────────────────────────────────────────────────────┐
 │  waste_classifier.py                                │
 │  -------------------------------------------------- │
-│  📥 Reçoit: "plastic_bottle"                        │
-│  🔍 SELECT bin_color FROM waste_classification      │
+│  📥 Reçoit: "plastic_bottle" 📥                    │
+│  🔍 SELECT bin_color FROM waste_classification 🔍  │
 │      WHERE item_name = 'plastic_bottle'             │
-│  ✅ Résultat: "yellow"                              │
-│  📤 Envoie "yellow\n" via port série                │
+│  ✅ Résultat: "yellow" ✅                          │
+│  📤 Envoie "yellow\n" via port série 📤            │
 └──────┬──────────────────────────────────────────────┘
        │
        │ USB Serial (/dev/ttyACM0, 9600 bauds)
@@ -344,23 +344,23 @@ Servos MG996R
 ┌─────────────────────────────────────────────────────┐
 │  smart_bin_controller.ino (Arduino)                 │
 │  -------------------------------------------------- │
-│  📥 Serial.read(): "yellow\n"                       │
-│  🎯 if (command == "yellow")                        │
-│  ⚙️  executeSortingSequence(150°, "YELLOW", 0)      │
+│  📥 Serial.read(): "yellow\n" 📥                   │
+│  🎯 if (command == "yellow") 🎯                    │
+│  ⚙️  executeSortingSequence(150°, "YELLOW", 0) ⚙️  │
 │                                                     │
-│  Phase 1: orientationServo.write(150°)             │
-│           delay(1000ms)                            │
+│  Phase 1: orientationServo.write(150°)              │
+│           delay(1000ms)                             │
 │                                                     │
-│  Phase 2: tiltServo.write(20°) // Bascule HAUT    │
-│           delay(600ms)                             │
+│  Phase 2: tiltServo.write(20°) // Bascule HAUT      │
+│           delay(600ms)                              │
 │                                                     │
-│  Phase 3: Vibrations 4x                            │
-│           tiltServo: 20° → 40° → 20°               │
+│  Phase 3: Vibrations 4x                             │
+│           tiltServo: 20° → 40° → 20°                │
 │                                                     │
-│  Phase 4: tiltServo.write(90°)                     │
-│           orientationServo.write(90°)              │
+│  Phase 4: tiltServo.write(90°)                      │
+│           orientationServo.write(90°)               │
 │                                                     │
-│  📤 Serial.println("✓ Termine")                     │
+│  ✓ Serial.println("✓ Termine")                     │
 └─────────────────────────────────────────────────────┘
 ```
 

@@ -180,7 +180,7 @@ bash scripts/run_auto.sh
 ┌────────────────────────────┐
 │  Smart Bin - Detection     │
 │                            │
-│  FPS: 15 | Detections: 2  │
+│  FPS: 15 | Detections: 2   │
 │  Tracking: plastic (2/3)   │
 │                            │
 │  ┌──────────────┐          │

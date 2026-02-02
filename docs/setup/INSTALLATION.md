@@ -250,7 +250,58 @@ quit
 → Quitter
 ```
 
-### Test 2 : Interface Web (Optionnel)
+### Test 2 : Mode Automatique (Avec YOLO)
+
+Une fois le mode manuel validé, testez la détection automatique avec YOLO :
+
+#### Prérequis pour YOLO
+- Caméra USB connectée
+- Package `ultralytics` installé (inclus dans requirements.txt)
+- Modèle YOLO entraîné présent dans `src/models/best.pt`
+
+#### Lancement du Mode YOLO
+```bash
+# Activer l'environnement (si pas déjà activé)
+# Windows :
+.venv\Scripts\activate
+# Linux/macOS :
+source .venv/bin/activate
+
+# Lancer la détection YOLO
+python src/yolo_detector.py
+```
+
+**Vous devriez voir :**
+```
+🤖 SMART BIN SI - MODE YOLO (avec caméra)
+Chargement du modèle YOLO...
+✓ Modèle chargé avec succès
+✓ Caméra initialisée
+Appuyez sur 'q' pour quitter, 'y' pour confirmer, 'n' pour rejeter
+
+Détection: plastic_bottle (confiance: 0.87)
+Confirmer ? [y/n]: 
+```
+
+#### Dépendances Nécessaires pour YOLO
+Le mode YOLO nécessite ces packages supplémentaires :
+- `ultralytics` : Framework YOLOv8 officiel
+- `tqdm` : Barres de progression
+- `requests` : Téléchargements de modèles
+- `seaborn` : Visualisations avancées (optionnel)
+
+Ces dépendances sont automatiquement installées avec `pip install -r requirements.txt`.
+
+#### Configuration YOLO
+Éditez `src/config.py` pour ajuster :
+```python
+MODEL_PATH = "src/models/best.pt"  # Chemin vers le modèle
+CONFIDENCE_THRESHOLD = 0.6         # Seuil de confiance minimum
+IOU_THRESHOLD = 0.45               # Seuil NMS
+CAMERA_SOURCE = 0                  # Index de la caméra
+```
+
+### Test 3 : Interface Web (Optionnel)
 
 ```bash
 # Dans le dossier admin_interface
@@ -276,7 +327,8 @@ Ouvrir le navigateur : **http://localhost:5000**
 - [ ] Packages installés : `pip list` affiche tous les packages
 - [ ] Arduino IDE installé et fonctionnel
 - [ ] Arduino téléversé : code chargé sans erreur
-- [ ] Mode manuel fonctionne : `python src/waste_classifier.py` démarrt correctement
+- [ ] Mode manuel fonctionne : `python src/waste_classifier.py` démarre correctement
+- [ ] Mode YOLO fonctionne (optionnel) : `python src/yolo_detector.py` détecte avec caméra
 - [ ] Caméra reconnue (optionnel) : se connecte sans erreur
 
 ### Tests de Diagnostic
@@ -288,10 +340,13 @@ python -c "import sys; print(f'Python {sys.version}')"
 # Test 2 : OpenCV fonctionne
 python -c "import cv2; print(f'OpenCV {cv2.__version__}')"
 
-# Test 3 : Connexion série possible
+# Test 3 : YOLO (ultralytics) fonctionne
+python -c "import ultralytics; print(f'Ultralytics {ultralytics.__version__}')"
+
+# Test 4 : Connexion série possible
 python -c "import serial; print('Série OK')"
 
-# Test 4 : Base de données créée
+# Test 5 : Base de données créée
 python -c "from src.waste_classifier import init_database; init_database(); print('DB créée')"
 ```
 
