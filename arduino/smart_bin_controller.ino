@@ -10,6 +10,7 @@
  * - Brown  : 30°  | Bascule HAUT   (vers 0°)
  * - Yellow : 150° | Bascule HAUT   (vers 0°)
  * - Green  : 90°  | Bascule BAS    (vers 180°)
+ * - Black  : 0°   | Bascule HAUT   (vers 0°)
  * 
  * MATÉRIEL :
  * - 2x Servomoteurs MG996R
@@ -43,6 +44,7 @@ const int POSITION_REST = 90;      // Position centrale/neutre
 const int ANGLE_BROWN = 30;        // Position bac marron
 const int ANGLE_YELLOW = 150;      // Position bac jaune
 const int ANGLE_GREEN = 90;        // Position bac vert (centre)
+const int ANGLE_BLACK = 0;         // Position bac noir
 
 // Angles d'inclinaison (vidage)
 const int TILT_UP = 20;            // Vidage vers le haut (proche de 0°)
@@ -79,7 +81,7 @@ void setup() {
   
   // Message de démarrage
   Serial.println("Smart Bin SI - Controleur Arduino Pret");
-  Serial.println("En attente de commandes : yellow, green, brown, stop, calibrate");
+  Serial.println("En attente de commandes : yellow, green, brown, black, stop, calibrate");
 }
 
 
@@ -102,6 +104,9 @@ void loop() {
     }
     else if (command == "green") {
       executeSortingSequence(ANGLE_GREEN, "GREEN", 1);  // 1 = bascule BAS
+    }
+    else if (command == "black") {
+      executeSortingSequence(ANGLE_BLACK, "BLACK", 0);  // 0 = bascule HAUT
     }
     else if (command == "stop") {
       emergencyStop();

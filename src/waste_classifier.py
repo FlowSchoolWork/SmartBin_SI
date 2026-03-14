@@ -64,9 +64,16 @@ def init_database():
             bin_color TEXT NOT NULL,
             item_name TEXT,
             timestamp TEXT NOT NULL,
-            confidence REAL DEFAULT 1.0
+            confidence REAL DEFAULT 1.0,
+            image_path TEXT
         )
     """)
+    
+    # Ajouter la colonne image_path si elle n'existe pas (migration)
+    try:
+        _conn.execute("ALTER TABLE sorting_history ADD COLUMN image_path TEXT")
+    except:
+        pass  # Colonne existe déjà
     
     # Table 3 : État des bacs (remplissage, dernière vidange)
     _conn.execute("""
@@ -218,6 +225,44 @@ def ask_user_for_bin(item_name):
     return None
 
 
+def ask_confirmation(item_name, bin_color):
+    """
+    Demande une confirmation après le tri via l'interface utilisateur.
+    "L'objet XXX a-t-il bien été jeté dans le bac YYY ?"
+    Retourne True si confirmé, False sinon.
+    """
+    if USER_INTERFACE_ENABLED:
+        try:
+            url = f"http://127.0.0.1:{USER_INTERFACE_PORT}/api/confirm"
+            resp = requests.post(url, json={
+                'item_name': item_name, 
+                'bin_color': bin_color
+            }, timeout=2)
+            if resp.ok:
+                data = resp.json()
+                task_id = data.get('task_id')
+                # Poller la réponse (timeout ~15s)
+                answer_url = f"http://127.0.0.1:{USER_INTERFACE_PORT}/api/confirm/{task_id}"
+                start = time.time()
+                while time.time() - start < 15:
+                    r = requests.get(answer_url, timeout=2)
+                    if r.ok:
+                        ans = r.json()
+                        if ans.get('answered'):
+                            return ans.get('confirmed', False)
+                    time.sleep(0.5)
+        except Exception:
+            pass
+    # Fallback console
+    print(f"\n✓ Tri effectué : {item_name} → {bin_color}")
+    print("C'était correct ? (o/n) : ", end="")
+    try:
+        choice = input().strip().lower()
+        return choice in ['o', 'oui', 'yes', 'y', '1']
+    except Exception:
+        return True
+
+
 def send_sort_command(bin_color):
     """Envoie la commande de tri à l'Arduino."""
     if _serial and _serial.is_open:
@@ -290,15 +335,15 @@ def get_stats():
         return []
 
 
-def log_detection(bin_color, item_name, confidence=1.0):
+def log_detection(bin_color, item_name, confidence=1.0, image_path=None):
     """Enregistre une détection dans l'historique."""
     if not _conn:
         return False
     try:
         _conn.execute("""
-            INSERT INTO sorting_history (bin_color, item_name, timestamp, confidence)
-            VALUES (?, ?, ?, ?)
-        """, (bin_color, item_name, datetime.now().isoformat(), confidence))
+            INSERT INTO sorting_history (bin_color, item_name, timestamp, confidence, image_path)
+            VALUES (?, ?, ?, ?, ?)
+        """, (bin_color, item_name, datetime.now().isoformat(), confidence, image_path))
         
         # Mise à jour du bac : +1 item
         _conn.execute("""
@@ -347,18 +392,46 @@ def empty_bin(bin_color):
 
 
 def get_detection_history(limit=50):
-    """Retourne l'historique des détections."""
+    """Retourne l'historique des détections formaté avec images."""
     if not _conn:
         return []
     try:
-        return _conn.execute("""
-            SELECT bin_color, item_name, timestamp, confidence
+        rows = _conn.execute("""
+            SELECT id, timestamp, item_name, bin_color, confidence, image_path
             FROM sorting_history
             ORDER BY timestamp DESC
             LIMIT ?
         """, (limit,)).fetchall()
+        return rows
     except Exception:
         return []
+
+
+def get_total_detections():
+    """Nombre total de détections."""
+    if not _conn:
+        return 0
+    try:
+        result = _conn.execute("SELECT COUNT(*) FROM sorting_history").fetchone()
+        return result[0] if result else 0
+    except Exception:
+        return 0
+
+
+def get_detections_by_bin():
+    """Détections regroupées par bac."""
+    if not _conn:
+        return {}
+    try:
+        rows = _conn.execute("""
+            SELECT bin_color, COUNT(*) as count
+            FROM sorting_history
+            GROUP BY bin_color
+            ORDER BY bin_color ASC
+        """).fetchall()
+        return {row[0]: row[1] for row in rows}
+    except Exception:
+        return {}
 
 
 # ============================================

@@ -1,16 +1,724 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>SmartBin - Admin</title>
-  <style>body{font-family:Arial;background:#f7f9fb;color:#222;padding:20px}h1{margin-top:0}a{color:#0366d6}</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartBin - Admin Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.2);
+            position: fixed;
+            left: 0;
+            top: 0;
+            height: 100vh;
+        }
+
+        .sidebar h2 {
+            margin-bottom: 30px;
+            font-size: 24px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .sidebar nav ul {
+            list-style: none;
+        }
+
+        .sidebar nav li {
+            margin-bottom: 10px;
+        }
+
+        .sidebar nav a {
+            display: block;
+            padding: 12px 15px;
+            color: #ecf0f1;
+            text-decoration: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+        }
+
+        .sidebar nav a:hover,
+        .sidebar nav a.active {
+            background: #3498db;
+            transform: translateX(5px);
+        }
+
+        /* Main content */
+        .main {
+            margin-left: 280px;
+            flex: 1;
+            overflow-y: auto;
+            background: #f5f7fa;
+            padding: 20px;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            color: #2c3e50;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            background: #27ae60;
+            color: white;
+        }
+
+        .section {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Grid layout */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .card h3 {
+            margin-bottom: 15px;
+            color: #2c3e50;
+            font-size: 16px;
+        }
+
+        .card-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #3498db;
+            margin-bottom: 10px;
+        }
+
+        .card-label {
+            font-size: 12px;
+            color: #7f8c8d;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Progress bars */
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #ecf0f1;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3498db, #2980b9);
+            transition: width 0.3s ease;
+        }
+
+        .progress-fill.warning {
+            background: linear-gradient(90deg, #f39c12, #e67e22);
+        }
+
+        .progress-fill.danger {
+            background: linear-gradient(90deg, #e74c3c, #c0392b);
+        }
+
+        /* Bins section */
+        .bins-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .bin-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-top: 4px solid;
+        }
+
+        .bin-card.yellow { border-top-color: #f39c12; }
+        .bin-card.green { border-top-color: #27ae60; }
+        .bin-card.brown { border-top-color: #8b6914; }
+        .bin-card.black { border-top-color: #2c3e50; }
+
+        .bin-name {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #2c3e50;
+        }
+
+        .bin-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            font-size: 12px;
+            margin: 15px 0;
+        }
+
+        .bin-stat {
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+
+        .bin-stat-label {
+            color: #7f8c8d;
+            font-size: 11px;
+        }
+
+        .bin-stat-value {
+            font-size: 16px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+            width: 100%;
+        }
+
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #2980b9;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+
+        /* History table */
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .history-table thead {
+            background: #ecf0f1;
+        }
+
+        .history-table th,
+        .history-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #bdc3c7;
+            font-size: 13px;
+        }
+
+        .history-table th {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+
+        .history-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .badge.yellow { background: #fef5e7; color: #f39c12; }
+        .badge.green { background: #e8f8f5; color: #27ae60; }
+        .badge.brown { background: #f4ecf7; color: #8b6914; }
+        .badge.black { background: #ecf0f1; color: #2c3e50; }
+
+        /* Editor */
+        .editor {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 20px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 400px;
+            padding: 15px;
+            border: 1px solid #bdc3c7;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            resize: vertical;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #ecf0f1;
+            border-top-color: #3498db;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+
+        .alert.success {
+            background: #d5f4e6;
+            color: #27ae60;
+            border-left: 4px solid #27ae60;
+        }
+
+        .alert.error {
+            background: #fadbd8;
+            color: #e74c3c;
+            border-left: 4px solid #e74c3c;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+    </style>
 </head>
 <body>
-  <h1>Admin Interface</h1>
-  <p><a href="/">Rafraîchir</a> — Vue simplifiée</p>
-  <p><a href="/api/bins/status">Voir état des bacs (JSON)</a></p>
-  <p><a href="/api/bins/history">Voir historique (JSON)</a></p>
-  <p><a href="http://127.0.0.1:5001" target="_blank">Ouvrir Interface Utilisateur</a></p>
+    <div class="container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <h2>🗑️ SmartBin</h2>
+            <nav>
+                <ul>
+                    <li><a href="#" onclick="switchSection('dashboard')" class="nav-link active">📊 Dashboard</a></li>
+                    <li><a href="#" onclick="switchSection('bins')" class="nav-link">🔹 Bacs</a></li>
+                    <li><a href="#" onclick="switchSection('history')" class="nav-link">📋 Historique</a></li>
+                    <li><a href="#" onclick="switchSection('equipment')" class="nav-link">🔌 Équipements</a></li>
+                    <li><a href="#" onclick="switchSection('config')" class="nav-link">⚙️ Configuration</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main content -->
+        <main class="main">
+            <!-- Dashboard -->
+            <section id="dashboard" class="section active">
+                <div class="header">
+                    <h1>📊 Tableau de Bord</h1>
+                    <span class="status-badge">Actif</span>
+                </div>
+
+                <div class="grid">
+                    <div class="card">
+                        <div class="card-label">CPU</div>
+                        <div class="card-value" id="cpu-usage">--</div>
+                        <div id="cpu-cores"></div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-label">RAM</div>
+                        <div class="card-value" id="ram-used">--</div>
+                        <div id="ram-total"></div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="ram-progress" style="width: 50%"></div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-label">DISQUE</div>
+                        <div class="card-value" id="disk-free">--</div>
+                        <div id="disk-total"></div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="disk-progress" style="width: 30%"></div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-label">UPTIME</div>
+                        <div class="card-value" id="uptime">--</div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-label">GPU</div>
+                        <div class="card-value" id="gpu-name">--</div>
+                        <div id="gpu-temp"></div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-label">HOSTNAME</div>
+                        <div class="card-value" id="hostname" style="font-size: 16px;">--</div>
+                    </div>
+                </div>
+
+                <div class="grid" style="margin-top: 20px;">
+                    <div class="card">
+                        <h3>📷 Caméra</h3>
+                        <div class="card-value" id="camera-status">Vérification...</div>
+                    </div>
+                    <div class="card">
+                        <h3>🖥️ Arduino</h3>
+                        <div class="card-value" id="arduino-status">Vérification...</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Bacs -->
+            <section id="bins" class="section">
+                <div class="header">
+                    <h1>🔹 Gestion des Bacs</h1>
+                </div>
+                <div class="bins-grid" id="bins-container">
+                    <div class="card"><div class="loading"></div> Chargement...</div>
+                </div>
+            </section>
+
+            <!-- Historique -->
+            <section id="history" class="section">
+                <div class="header">
+                    <h1>📋 Historique des Détections</h1>
+                </div>
+                <div class="card full-width">
+                    <table class="history-table">
+                        <thead>
+                            <tr>
+                                <th>Heure</th>
+                                <th>Objet</th>
+                                <th>Bac</th>
+                                <th>Confiance</th>
+                                <th>Image</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-body">
+                            <tr><td colspan="5" style="text-align: center;"><div class="loading"></div></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Équipements -->
+            <section id="equipment" class="section">
+                <div class="header">
+                    <h1>🔌 État des Équipements</h1>
+                </div>
+                <div class="grid">
+                    <div class="card">
+                        <h3>📷 Caméra</h3>
+                        <div id="camera-detail">Vérification...</div>
+                    </div>
+                    <div class="card">
+                        <h3>🖥️ Arduino</h3>
+                        <div id="arduino-detail">Vérification...</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Configuration -->
+            <section id="config" class="section">
+                <div class="header">
+                    <h1>⚙️ Configuration</h1>
+                </div>
+                <div class="editor">
+                    <div id="config-alert"></div>
+                    <textarea id="config-text" placeholder="Chargement de la configuration..."></textarea>
+                    <div style="margin-top: 15px;">
+                        <button class="btn btn-primary" onclick="saveConfig()">💾 Sauvegarder</button>
+                        <button class="btn btn-primary" onclick="loadConfig()" style="background: #95a5a6;">🔄 Recharger</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        // Navigation
+        function switchSection(sectionId) {
+            document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+            document.getElementById(sectionId).classList.add('active');
+            
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            if (sectionId === 'dashboard') updateDashboard();
+            if (sectionId === 'bins') updateBins();
+            if (sectionId === 'history') updateHistory();
+            if (sectionId === 'equipment') updateEquipment();
+            if (sectionId === 'config') loadConfig();
+        }
+
+        // API calls
+        async function apiCall(endpoint) {
+            try {
+                const response = await fetch(endpoint);
+                return await response.json();
+            } catch (error) {
+                console.error('API Error:', error);
+                return { success: false, error: error.message };
+            }
+        }
+
+        // Dashboard
+        async function updateDashboard() {
+            const data = await apiCall('/api/system/info');
+            if (data.success) {
+                document.getElementById('cpu-usage').textContent = data.cpu.usage_percent.toFixed(1) + '%';
+                document.getElementById('cpu-cores').textContent = `${data.cpu.cores} cores @ ${data.cpu.frequency_ghz} GHz`;
+                
+                document.getElementById('ram-used').textContent = data.ram.used_gb + ' GB';
+                document.getElementById('ram-total').textContent = `/ ${data.ram.total_gb} GB`;
+                document.getElementById('ram-progress').style.width = data.ram.percent + '%';
+                document.getElementById('ram-progress').className = 'progress-fill ' + 
+                    (data.ram.percent > 80 ? 'danger' : data.ram.percent > 60 ? 'warning' : '');
+                
+                document.getElementById('disk-free').textContent = data.disk.free_gb + ' GB';
+                document.getElementById('disk-total').textContent = `/ ${data.disk.total_gb} GB`;
+                document.getElementById('disk-progress').style.width = data.disk.percent + '%';
+                document.getElementById('disk-progress').className = 'progress-fill ' + 
+                    (data.disk.percent > 80 ? 'danger' : data.disk.percent > 60 ? 'warning' : '');
+                
+                document.getElementById('uptime').textContent = data.uptime;
+                document.getElementById('hostname').textContent = data.system.hostname;
+            }
+
+            const gpu = await apiCall('/api/gpu/info');
+            if (gpu.success && gpu.gpu) {
+                document.getElementById('gpu-name').textContent = gpu.gpu.name.substring(0, 15);
+                document.getElementById('gpu-temp').textContent = gpu.gpu.temperature_celsius + '°C';
+            } else {
+                document.getElementById('gpu-name').textContent = 'N/A';
+            }
+
+            const camera = await apiCall('/api/equipment/camera');
+            const arduino = await apiCall('/api/equipment/arduino');
+
+            if (camera.success && camera.camera.connected) {
+                document.getElementById('camera-status').textContent = '✅ Connectée';
+            } else {
+                document.getElementById('camera-status').textContent = '❌ Déconnectée';
+            }
+
+            if (arduino.success && arduino.arduino.connected) {
+                document.getElementById('arduino-status').textContent = '✅ Connecté';
+            } else {
+                document.getElementById('arduino-status').textContent = '❌ Déconnecté';
+            }
+        }
+
+        // Bacs
+        async function updateBins() {
+            const data = await apiCall('/api/bins/status');
+            if (data.success) {
+                let html = '';
+                const colors = ['yellow', 'green', 'brown', 'black'];
+                const names = { yellow: '♻️ Recyclage', green: '🥤 Verre', brown: '🌿 Biodéchets', black: '🗑️ Ordures' };
+                
+                colors.forEach(color => {
+                    const bin = data.bins[color];
+                    if (bin) {
+                        const fillClass = bin.fill_percent > 80 ? 'danger' : bin.fill_percent > 60 ? 'warning' : '';
+                        html += `
+                            <div class="bin-card ${color}">
+                                <div class="bin-name">${names[color]}</div>
+                                <div class="bin-info">
+                                    <div class="bin-stat">
+                                        <div class="bin-stat-label">Remplissage</div>
+                                        <div class="bin-stat-value">${bin.fill_percent.toFixed(1)}%</div>
+                                    </div>
+                                    <div class="bin-stat">
+                                        <div class="bin-stat-label">Items</div>
+                                        <div class="bin-stat-value">${bin.item_count}</div>
+                                    </div>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill ${fillClass}" style="width: ${bin.fill_percent}%"></div>
+                                </div>
+                                <div class="bin-stat" style="margin-top: 10px;">
+                                    <div class="bin-stat-label">Dernier vidage</div>
+                                    <div class="bin-stat-value" style="font-size: 12px;">${bin.last_emptied}</div>
+                                </div>
+                                <button class="btn btn-danger" onclick="emptyBin('${color}')">🗑️ Vider</button>
+                            </div>
+                        `;
+                    }
+                });
+                document.getElementById('bins-container').innerHTML = html;
+            }
+        }
+
+        async function emptyBin(color) {
+            if (confirm(`Vider le bac ${color} ?`)) {
+                const response = await fetch(`/api/bins/empty/${color}`, { method: 'POST' });
+                const data = await response.json();
+                alert(data.success ? 'Bac vidé!' : 'Erreur: ' + data.error);
+                updateBins();
+            }
+        }
+
+        // Historique
+        async function updateHistory() {
+            const data = await apiCall('/api/bins/history?limit=20');
+            if (data.success) {
+                const binColors = { yellow: '🟡', green: '🟢', brown: '🟤', black: '⚫' };
+                let html = '';
+                data.history.forEach(item => {
+                    // Nouveau format: [id, timestamp, item_name, bin_color, confidence, image_path]
+                    const [id, timestamp, item_name, bin_color, confidence, image_path] = item;
+                    const imgHtml = image_path ? 
+                        `<img src="/api/image/${image_path}" style="max-width:60px; max-height:60px; border-radius:4px; cursor:pointer;" onclick="showImageModal('/api/image/${image_path}')">` :
+                        'N/A';
+                    html += `
+                        <tr>
+                            <td>${timestamp}</td>
+                            <td>${item_name}</td>
+                            <td><span class="badge ${bin_color}">${binColors[bin_color] || ''} ${bin_color}</span></td>
+                            <td>${(confidence * 100).toFixed(0)}%</td>
+                            <td>${imgHtml}</td>
+                        </tr>
+                    `;
+                });
+                document.getElementById('history-body').innerHTML = html || '<tr><td colspan="5">Aucune détection</td></tr>';
+            }
+        }
+
+        function showImageModal(src) {
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); display:flex; align-items:center; justify-content:center; z-index:10000;';
+            modal.innerHTML = `<img src="${src}" style="max-width:90%; max-height:90%; border-radius:8px;">`;
+            modal.onclick = () => modal.remove();
+            document.body.appendChild(modal);
+        }
+
+        // Équipements
+        async function updateEquipment() {
+            const camera = await apiCall('/api/equipment/camera');
+            const arduino = await apiCall('/api/equipment/arduino');
+
+            let cameraHtml = camera.success && camera.camera.connected ? 
+                '✅ Caméra connectée' : '❌ Caméra déconnectée';
+            document.getElementById('camera-detail').innerHTML = cameraHtml;
+
+            let arduinoHtml = arduino.success && arduino.arduino.connected ? 
+                `✅ Arduino connecté (${arduino.arduino.port || 'Port non détecté'})` : 
+                '❌ Arduino déconnecté';
+            document.getElementById('arduino-detail').innerHTML = arduinoHtml;
+        }
+
+        // Configuration
+        async function loadConfig() {
+            const data = await apiCall('/api/config/read');
+            if (data.success) {
+                document.getElementById('config-text').value = data.content;
+                document.getElementById('config-alert').innerHTML = '';
+            }
+        }
+
+        async function saveConfig() {
+            const content = document.getElementById('config-text').value;
+            const response = await fetch('/api/config/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content })
+            });
+            const data = await response.json();
+            const alert = document.getElementById('config-alert');
+            if (data.success) {
+                alert.innerHTML = '<div class="alert success">✅ Configuration sauvegardée</div>';
+            } else {
+                alert.innerHTML = `<div class="alert error">❌ Erreur: ${data.error}</div>`;
+            }
+        }
+
+        // Auto-update dashboard every 5 seconds
+        setInterval(() => {
+            const activeSection = document.querySelector('.section.active');
+            if (activeSection && activeSection.id === 'dashboard') {
+                updateDashboard();
+            }
+        }, 5000);
+
+        // Initial load
+        loadConfig();
+        updateDashboard();
+    </script>
 </body>
 </html>

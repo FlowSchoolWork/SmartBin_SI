@@ -45,7 +45,7 @@ SORTING_DURATION = 10          # Durée d'attente pour le tri en secondes
 # ============================================
 # CONFIGURATION DE L'APPRENTISSAGE
 # ============================================
-LEARNING_MODE = True      # Mode apprentissage : validation manuelle des détections
+LEARNING_MODE = False      # Mode apprentissage : validation manuelle des détections
 SAVE_IMAGES = True        # Sauvegarder les images de détection
 MIN_DETECTIONS = 3        # Nombre minimum de détections consécutives avant tri
 AUTO_SORT_DELAY = 2.0     # Délai entre deux opérations de tri en secondes
@@ -53,25 +53,24 @@ AUTO_SORT_DELAY = 2.0     # Délai entre deux opérations de tri en secondes
 # ============================================
 # CONFIGURATION DES BACS DE TRI
 # ============================================
-VALID_BINS = ["yellow", "green", "brown"]  # Bacs de tri valides
+VALID_BINS = ["yellow", "green", "brown", "black"]  # Bacs de tri valides
 
 # Mapping par défaut des objets détectés vers les bacs
-# jaune=recyclable, vert=organique, marron=déchets généraux
-# Les nouveaux objets appris sont stockés en base de données
+# jaune=emballages et papiers, vert=verre, marron=biodéchets, noir=ordures ménagères
 WASTE_TO_BIN_MAPPING = {
     "plastic": "yellow",
     "plastic_bottle": "yellow",
-    "bottle": "yellow",
+    "bottle": "green",  # verre
     "cardboard": "yellow",
     "paper": "yellow",
     "metal": "yellow",
-    "glass": "yellow",
+    "glass": "green",
     "can": "yellow",
-    "banana_peel": "green",
-    "food": "green",
-    "organic": "green",
-    "tissue": "brown",
-    "trash": "brown",
+    "banana_peel": "brown",
+    "food": "brown",
+    "organic": "brown",
+    "tissue": "black",
+    "trash": "black",
 }
 
 # Couleurs pour l'affichage OpenCV (format BGR)
@@ -79,6 +78,7 @@ BIN_COLORS = {
     "yellow": (0, 255, 255),  # Jaune
     "green": (0, 255, 0),     # Vert
     "brown": (50, 100, 165),  # Marron
+    "black": (0, 0, 0),       # Noir
     "unknown": (128, 128, 128)  # Gris pour inconnu
 }
 

@@ -35,10 +35,11 @@ Smart Bin SI est un **système de tri automatique de déchets** qui utilise l'in
 ### ✨ Fonctionnalités principales
 
 ✅ **Détection en temps réel** des déchets via caméra  
-✅ **Classification intelligente** en 3 catégories :
-- 🟡 **Jaune** : Recyclable (plastique, carton, métal, verre)
-- 🟢 **Vert** : Organique/Compost (déchets alimentaires, biodégradable)
-- 🟤 **Marron** : Déchets généraux (non-recyclable)
+✅ **Classification intelligente** en 4 catégories :
+- 🟡 **Jaune** : Emballages (plastique, métal, carton) et papiers
+- 🟢 **Vert** : Verre (bouteilles, bocaux, pots)
+- 🟤 **Marron** : Biodéchets (végétaux, déchets alimentaires)
+- ⚫ **Noir** : Ordures ménagères résiduelles
 
 ✅ **Apprentissage continu** : valide les détections et les enregistre  
 ✅ **Base de données intelligente** : mémorise toutes les classifications  

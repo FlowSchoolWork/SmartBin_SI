@@ -511,17 +511,18 @@ class WasteDetector:
                     if self.should_trigger_sort(best_detection):
                         waste_class = best_detection['class']
                         
-                        # En mode apprentissage, demander confirmation
+                        # En mode apprentissage, demander confirmation AVANT le tri
                         if LEARNING_MODE:
                             corrected_class = self.handle_correction(self.last_frame, best_detection)
                             if corrected_class is None:
                                 continue  # Ignoré par l'utilisateur
                             waste_class = corrected_class
                         
-                        print(f"\n🎯 TRI AUTO DÉCLENCHÉ : {waste_class}")
+                        print(f"\n🎯 OBJET DÉTECTÉ : {waste_class}")
+                        print(f"⏸️  Pause de 5 secondes avant tri...")
+                        time.sleep(5)  # 5 secondes de pause après détection
                         
                         # Utiliser waste_classifier pour le tri
-                        # ask_if_unknown=True pour permettre d'apprendre
                         bin_color = waste_classifier.classify_and_sort(
                             waste_class,
                             ask_if_unknown=True,
@@ -529,7 +530,15 @@ class WasteDetector:
                         )
                         
                         if bin_color:
-                            print(f"✓ Trié vers le bac {bin_color}")
+                            print(f"✓ Tri vers le bac {bin_color}")
+                            
+                            # Demander confirmation via l'UI
+                            is_correct = waste_classifier.ask_confirmation(waste_class, bin_color)
+                            if is_correct:
+                                print("✅ Tri confirmé et enregistré")
+                            else:
+                                print("❌ Tri non confirmé - information ignorée")
+
                 
                 # Calculer les FPS
                 fps_counter += 1
@@ -618,27 +627,74 @@ class WasteDetector:
 
 def main():
     """Exécuter la détection YOLO"""
-    # Démarrer l'interface administrateur automatiquement si demandé
-    if ADMIN_AUTOSTART:
-        try:
-            # Vérifier si quelqu'un écoute déjà sur les ports admin et user
-            s = socket.socket()
-            s.settimeout(0.5)
+    from config import ADMIN_AUTOSTART
+    
+    # Menu de choix des interfaces si ADMIN_AUTOSTART est désactivé
+    admin_interface_required = False
+    user_interface_required = False
+    
+    if not ADMIN_AUTOSTART:
+        print("\n" + "="*60)
+        print("DÉCLARATION DU SYSTÈME DE SMART BIN SI")
+        print("="*60)
+        print("\nQuelle interface voulez-vous lancer ?")
+        print("1. 🔹 Admin uniquement (supervision complète)")
+        print("2. 👤 User uniquement (affectation des objets)")
+        print("3. 🔹👤 Admin + User (complète)")
+        print("4. ⚙️  Aucune interface (détection caméra uniquement)")
+        print("="*60)
+        
+        choice = input("\nVotre choix (1-4) : ").strip()
+        
+        if choice == "1":
+            admin_interface_required = True
+            print("\n→ Lancement de l'interface Admin uniquement\n")
+        elif choice == "2":
+            user_interface_required = True
+            print("\n→ Lancement de l'interface User uniquement\n")
+        elif choice == "3":
+            admin_interface_required = True
+            user_interface_required = True
+            print("\n→ Lancement de l'interface Admin + User\n")
+        elif choice == "4":
+            print("\n→ Mode sans interface (détection caméra uniquement)\n")
+        else:
+            print("\n⚠ Choix invalide ! Démarrage avec Admin + User par défaut\n")
+            admin_interface_required = True
+            user_interface_required = True
+    else:
+        # Si ADMIN_AUTOSTART est activé, lancer automatiquement admin et user
+        admin_interface_required = True
+        user_interface_required = True
+    
+    # Lancer les interfaces selon le choix
+    if admin_interface_required or user_interface_required:
+        print("🚀 Démarrage des interfaces...")
+        
+        # Admin interface
+        if admin_interface_required:
             try:
-                s.connect(("127.0.0.1", ADMIN_INTERFACE_PORT))
-                s.close()
-                print(f"→ Interface admin déjà en écoute sur le port {ADMIN_INTERFACE_PORT}")
-            except Exception:
-                # Lancer le serveur admin_interface dans interfaces/
-                admin_path = Path(__file__).resolve().parent.parent / 'interfaces' / 'admin_interface' / 'app.py'
-                if admin_path.exists():
-                    print(f"→ Lancement automatique de l'interface admin ({admin_path})")
-                    try:
-                        subprocess.Popen([sys.executable, str(admin_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    except Exception as e:
-                        print(f"⚠ Impossible de lancer l'interface admin: {e}")
-
-            # User interface
+                s = socket.socket()
+                s.settimeout(0.5)
+                try:
+                    s.connect(("127.0.0.1", ADMIN_INTERFACE_PORT))
+                    s.close()
+                    print(f"→ Interface admin déjà en écoute sur le port {ADMIN_INTERFACE_PORT}")
+                except Exception:
+                    admin_path = Path(__file__).resolve().parent.parent / 'interfaces' / 'admin_interface' / 'app.py'
+                    if admin_path.exists():
+                        print(f"→ Démarrage interface admin ({ADMIN_INTERFACE_PORT})")
+                        try:
+                            subprocess.Popen([sys.executable, str(admin_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                            time.sleep(1)
+                            print(f"   ✓ Admin disponible à http://127.0.0.1:{ADMIN_INTERFACE_PORT}")
+                        except Exception as e:
+                            print(f"   ⚠ Impossible de lancer l'interface admin: {e}")
+            except Exception as e:
+                print(f"   ⚠ Erreur au démarrage de l'interface admin: {e}")
+        
+        # User interface
+        if user_interface_required:
             try:
                 s2 = socket.socket()
                 s2.settimeout(0.5)
@@ -648,13 +704,19 @@ def main():
             except Exception:
                 user_path = Path(__file__).resolve().parent.parent / 'interfaces' / 'user_interface' / 'app.py'
                 if user_path.exists():
-                    print(f"→ Lancement automatique de l'interface utilisateur ({user_path})")
+                    print(f"→ Démarrage interface user ({USER_INTERFACE_PORT})")
                     try:
                         subprocess.Popen([sys.executable, str(user_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        time.sleep(1)
+                        print(f"   ✓ User disponible à http://127.0.0.1:{USER_INTERFACE_PORT}")
                     except Exception as e:
-                        print(f"⚠ Impossible de lancer l'interface utilisateur: {e}")
-        except Exception:
-            pass
+                        print(f"   ⚠ Impossible de lancer l'interface utilisateur: {e}")
+            except Exception as e:
+                print(f"   ⚠ Erreur au démarrage de l'interface user: {e}")
+        
+        print()
+    
+    # Lancer la détection YOLO
     detector = WasteDetector()
     detector.run_camera_detection()
 

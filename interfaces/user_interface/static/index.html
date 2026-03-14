@@ -1,16 +1,441 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>SmartBin - Utilisateur</title>
-  <link rel="stylesheet" href="/static/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SmartBin - Tri Interactif</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #ffffff;
+            color: #333333;
+            overflow: hidden;
+        }
+
+        .container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #ffffff;
+        }
+
+        .waiting {
+            text-align: center;
+            color: #333333;
+        }
+
+        .waiting h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            color: #4CAF50;
+        }
+
+        .waiting p {
+            font-size: 24px;
+            margin-bottom: 40px;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 6px solid #f3f3f3;
+            border-top-color: #4CAF50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .task-screen {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: #ffffff;
+            transition: all 0.5s ease;
+        }
+
+        .task-screen.hidden {
+            display: none;
+        }
+
+        .item-display {
+            font-size: 48px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .item-name {
+            font-size: 36px;
+            font-weight: bold;
+            color: #333333;
+            margin-bottom: 40px;
+            text-align: center;
+        }
+
+        .question {
+            font-size: 24px;
+            color: #666666;
+            margin-bottom: 40px;
+            text-align: center;
+        }
+
+        .bin-selector {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+            max-width: 600px;
+            width: 100%;
+            padding: 20px;
+        }
+
+        .bin-button {
+            aspect-ratio: 1;
+            border: 2px solid #cccccc;
+            border-radius: 15px;
+            font-size: 24px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background-color: #f9f9f9;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 20px;
+        }
+
+        .bin-button:hover {
+            border-color: #4CAF50;
+            background-color: #e8f5e8;
+            transform: scale(1.05);
+        }
+
+        .bin-button:active {
+            transform: scale(0.95);
+        }
+
+        .bin-button.yellow {
+            border-color: #ffeb3b;
+            background-color: #fffde7;
+        }
+
+        .bin-button.yellow:hover {
+            background-color: #fff9c4;
+        }
+
+        .bin-button.green {
+            border-color: #4caf50;
+            background-color: #e8f5e8;
+        }
+
+        .bin-button.green:hover {
+            background-color: #c8e6c9;
+        }
+
+        .bin-button.brown {
+            border-color: #795548;
+            background-color: #efebe9;
+        }
+
+        .bin-button.brown:hover {
+            background-color: #d7ccc8;
+        }
+
+        .bin-button.black {
+            border-color: #424242;
+            background-color: #f5f5f5;
+        }
+
+        .bin-button.black:hover {
+            background-color: #e0e0e0;
+        }
+
+        .bin-icon {
+            font-size: 32px;
+        }
+
+        .bin-label {
+            font-size: 16px;
+            text-align: center;
+        }
+
+        .error-button {
+            margin-top: 20px;
+            padding: 15px 30px;
+            background-color: #f44336;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .error-button:hover {
+            background-color: #d32f2f;
+            transform: scale(1.05);
+        }
+
+        .confirmation-screen {
+            text-align: center;
+            background-color: #ffffff;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .confirmation-screen h2 {
+            font-size: 36px;
+            color: #4CAF50;
+            margin-bottom: 20px;
+        }
+
+        .confirmation-details {
+            font-size: 24px;
+            margin-bottom: 30px;
+            color: #333333;
+        }
+
+        .confirmation-buttons {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+
+        .confirm-button {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .confirm-good {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        .confirm-good:hover {
+            background-color: #45a049;
+            transform: scale(1.05);
+        }
+
+        .confirm-error {
+            background-color: #f44336;
+            color: white;
+        }
+
+        .confirm-error:hover {
+            background-color: #d32f2f;
+            transform: scale(1.05);
+        }
+
+        .image-preview {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+
+        .timeout-message {
+            font-size: 18px;
+            color: #666666;
+            margin-top: 20px;
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Interface Utilisateur - Assignation</h1>
-    <div id="taskArea">Aucune tâche en attente.</div>
-  </div>
-  <script src="/static/script.js"></script>
+    <div class="container">
+        <div id="waiting" class="waiting">
+            <h1>Hello !</h1>
+            <p>SmartBin prêt à trier vos déchets</p>
+            <div class="spinner"></div>
+        </div>
+
+        <div id="taskScreen" class="task-screen hidden">
+            <div class="item-display">
+                <img id="itemImage" class="image-preview" style="display:none;">
+                <div class="item-name" id="itemName"></div>
+            </div>
+            
+            <div class="question">Dans quelle poubelle va cet objet ?</div>
+            
+            <div class="bin-selector">
+                <button class="bin-button yellow" onclick="selectBin('yellow')">
+                    <span class="bin-icon">♻️</span>
+                    <span class="bin-label">Recyclage</span>
+                </button>
+                <button class="bin-button green" onclick="selectBin('green')">
+                    <span class="bin-icon">🥤</span>
+                    <span class="bin-label">Verre</span>
+                </button>
+                <button class="bin-button brown" onclick="selectBin('brown')">
+                    <span class="bin-icon">🌿</span>
+                    <span class="bin-label">Biodéchets</span>
+                </button>
+                <button class="bin-button black" onclick="selectBin('black')">
+                    <span class="bin-icon">🗑️</span>
+                    <span class="bin-label">Ordures</span>
+                </button>
+            </div>
+            
+            <button class="error-button" onclick="rejectItem()">❌ Erreur / Indécis</button>
+        </div>
+
+        <div id="confirmationScreen" class="task-screen hidden">
+            <div class="confirmation-screen">
+                <h2>Objet jeté !</h2>
+                <div class="confirmation-details" id="confirmationDetails"></div>
+                <div class="confirmation-buttons">
+                    <button class="confirm-button confirm-good" onclick="confirmGood()">✅ C'est bon</button>
+                    <button class="confirm-button confirm-error" onclick="confirmError()">❌ Erreur</button>
+                </div>
+                <div class="timeout-message">Retour automatique dans <span id="timeoutCounter">10</span> secondes...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentTaskId = null;
+        let currentItemName = null;
+        let currentImagePath = null;
+        let selectedBin = null;
+        let timeoutId = null;
+        let timeoutCounter = 10;
+
+        // Démarrer le polling des tâches
+        function pollTasks() {
+            fetch('/api/tasks')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success && data.pending.length > 0) {
+                        const task = data.pending[0];
+                        showTask(task);
+                    } else {
+                        showWaiting();
+                        setTimeout(pollTasks, 1000);
+                    }
+                })
+                .catch(() => {
+                    setTimeout(pollTasks, 2000);
+                });
+        }
+
+        function showWaiting() {
+            clearTimeout(timeoutId);
+            document.getElementById('waiting').style.display = 'flex';
+            document.getElementById('taskScreen').classList.add('hidden');
+            document.getElementById('confirmationScreen').classList.add('hidden');
+        }
+
+        function showTask(task) {
+            currentTaskId = task.task_id;
+            currentItemName = task.item_name;
+            currentImagePath = task.image_path || null;
+
+            document.getElementById('itemName').textContent = currentItemName.replace(/_/g, ' ').toUpperCase();
+            
+            const imgElement = document.getElementById('itemImage');
+            if (currentImagePath) {
+                imgElement.src = `/api/image/${currentImagePath}`;
+                imgElement.style.display = 'block';
+            } else {
+                imgElement.style.display = 'none';
+            }
+
+            document.getElementById('waiting').style.display = 'none';
+            document.getElementById('taskScreen').classList.remove('hidden');
+            document.getElementById('confirmationScreen').classList.add('hidden');
+        }
+
+        function selectBin(binColor) {
+            selectedBin = binColor;
+            showConfirmation();
+        }
+
+        function rejectItem() {
+            selectedBin = null;
+            showWaiting();
+            setTimeout(pollTasks, 1000);
+        }
+
+        function showConfirmation() {
+            const binNames = {
+                'yellow': 'Recyclage',
+                'green': 'Verre', 
+                'brown': 'Biodéchets',
+                'black': 'Ordures'
+            };
+            
+            const binColors = {
+                'yellow': 'Jaune',
+                'green': 'Vert',
+                'brown': 'Marron', 
+                'black': 'Noir'
+            };
+
+            const details = `Objet: ${currentItemName.replace(/_/g, ' ')}<br>Couleur: ${binColors[selectedBin]}<br>Poubelle: ${binNames[selectedBin]}`;
+            document.getElementById('confirmationDetails').innerHTML = details;
+
+            document.getElementById('taskScreen').classList.add('hidden');
+            document.getElementById('confirmationScreen').classList.remove('hidden');
+
+            // Démarrer le timeout
+            timeoutCounter = 10;
+            document.getElementById('timeoutCounter').textContent = timeoutCounter;
+            timeoutId = setInterval(() => {
+                timeoutCounter--;
+                document.getElementById('timeoutCounter').textContent = timeoutCounter;
+                if (timeoutCounter <= 0) {
+                    confirmGood();
+                }
+            }, 1000);
+        }
+
+        function confirmGood() {
+            clearTimeout(timeoutId);
+            if (!currentTaskId || !selectedBin) return;
+
+            fetch(`/api/answer/${currentTaskId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bin_color: selectedBin })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showWaiting();
+                    setTimeout(pollTasks, 1000);
+                }
+            });
+        }
+
+        function confirmError() {
+            clearTimeout(timeoutId);
+            // Retourner à la sélection
+            document.getElementById('confirmationScreen').classList.add('hidden');
+            document.getElementById('taskScreen').classList.remove('hidden');
+        }
+
+        // Démarrer au chargement
+        pollTasks();
+    </script>
 </body>
 </html>
