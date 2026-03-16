@@ -24,6 +24,18 @@ except ImportError:
         VALID_BINS, WASTE_TO_BIN_MAPPING,
     )
 
+# Option d'interface utilisateur web
+try:
+    from config import USER_INTERFACE_ENABLED, USER_INTERFACE_PORT
+except Exception:
+    USER_INTERFACE_ENABLED = False
+    USER_INTERFACE_PORT = 5001
+
+if USER_INTERFACE_ENABLED:
+    import requests
+    import time
+    import webbrowser
+
 # Connexions globales
 _conn = None
 _serial = None
@@ -52,9 +64,16 @@ def init_database():
             bin_color TEXT NOT NULL,
             item_name TEXT,
             timestamp TEXT NOT NULL,
-            confidence REAL DEFAULT 1.0
+            confidence REAL DEFAULT 1.0,
+            image_path TEXT
         )
     """)
+    
+    # Ajouter la colonne image_path si elle n'existe pas (migration)
+    try:
+        _conn.execute("ALTER TABLE sorting_history ADD COLUMN image_path TEXT")
+    except:
+        pass  # Colonne existe déjà
     
     # Table 3 : État des bacs (remplissage, dernière vidange)
     _conn.execute("""
@@ -158,6 +177,37 @@ def ask_user_for_bin(item_name):
     Demande à l'utilisateur dans quel bac mettre cet objet.
     Retourne la couleur du bac ou None si annulé.
     """
+    # Si l'interface utilisateur web est activée, tenter d'envoyer la question
+    if USER_INTERFACE_ENABLED:
+        try:
+            url = f"http://127.0.0.1:{USER_INTERFACE_PORT}/api/ask"
+            resp = requests.post(url, json={'item_name': item_name}, timeout=2)
+            if resp.ok:
+                data = resp.json()
+                task_id = data.get('task_id')
+                # Ouvrir automatiquement l'interface utilisateur dans le navigateur
+                try:
+                    webbrowser.open(f"http://127.0.0.1:{USER_INTERFACE_PORT}/?task={task_id}")
+                except Exception:
+                    pass
+                # Poller la réponse (timeout total ~20s)
+                answer_url = f"http://127.0.0.1:{USER_INTERFACE_PORT}/api/answer/{task_id}"
+                start = time.time()
+                while time.time() - start < 20:
+                    r = requests.get(answer_url, timeout=2)
+                    if r.ok:
+                        ans = r.json()
+                        if ans.get('answered'):
+                            bin_color = ans.get('bin_color')
+                            if bin_color in VALID_BINS:
+                                return bin_color
+                            else:
+                                return None
+                    time.sleep(0.5)
+        except Exception:
+            pass
+
+    # Fallback console
     print(f"\n📦 Objet inconnu : '{item_name}'")
     print("Dans quel bac le mettre ?")
     for i, b in enumerate(VALID_BINS, 1):
@@ -175,6 +225,44 @@ def ask_user_for_bin(item_name):
     return None
 
 
+def ask_confirmation(item_name, bin_color):
+    """
+    Demande une confirmation après le tri via l'interface utilisateur.
+    "L'objet XXX a-t-il bien été jeté dans le bac YYY ?"
+    Retourne True si confirmé, False sinon.
+    """
+    if USER_INTERFACE_ENABLED:
+        try:
+            url = f"http://127.0.0.1:{USER_INTERFACE_PORT}/api/confirm"
+            resp = requests.post(url, json={
+                'item_name': item_name, 
+                'bin_color': bin_color
+            }, timeout=2)
+            if resp.ok:
+                data = resp.json()
+                task_id = data.get('task_id')
+                # Poller la réponse (timeout ~15s)
+                answer_url = f"http://127.0.0.1:{USER_INTERFACE_PORT}/api/confirm/{task_id}"
+                start = time.time()
+                while time.time() - start < 15:
+                    r = requests.get(answer_url, timeout=2)
+                    if r.ok:
+                        ans = r.json()
+                        if ans.get('answered'):
+                            return ans.get('confirmed', False)
+                    time.sleep(0.5)
+        except Exception:
+            pass
+    # Fallback console
+    print(f"\n✓ Tri effectué : {item_name} → {bin_color}")
+    print("C'était correct ? (o/n) : ", end="")
+    try:
+        choice = input().strip().lower()
+        return choice in ['o', 'oui', 'yes', 'y', '1']
+    except Exception:
+        return True
+
+
 def send_sort_command(bin_color):
     """Envoie la commande de tri à l'Arduino."""
     if _serial and _serial.is_open:
@@ -189,12 +277,13 @@ def send_sort_command(bin_color):
     return True
 
 
-def classify_and_sort(item_name, ask_if_unknown=True, auto_mode=False, confidence=1.0):
+def classify_and_sort(item_name, ask_if_unknown=True, auto_mode=False, confidence=1.0, perform_sort=True):
     """
-    Détermine le bac pour l'objet, enregistre si nouveau, envoie la commande de tri.
+    Détermine le bac pour l'objet, enregistre si nouveau, et optionnellement envoie la commande de tri.
     - ask_if_unknown: si True, demande à l'utilisateur pour un objet inconnu
     - auto_mode: si True, utilise uniquement le mapping sans demander
     - confidence: confiance de la détection (0-1)
+    - perform_sort: si True, envoie aussi la commande de tri à l'Arduino
     Retourne la couleur du bac utilisée, ou None.
     """
     if not item_name:
@@ -225,11 +314,12 @@ def classify_and_sort(item_name, ask_if_unknown=True, auto_mode=False, confidenc
         # LOG LA DÉTECTION
         log_detection(bin_color, item_name, confidence)
         
-        # Envoyer commande Arduino
-        send_sort_command(bin_color)
-        if _serial and _serial.is_open:
-            import time
-            time.sleep(SORTING_DURATION)
+        # Envoi optionnel du tri vers l'Arduino
+        if perform_sort:
+            send_sort_command(bin_color)
+            if _serial and _serial.is_open:
+                import time
+                time.sleep(SORTING_DURATION)
     return bin_color
 
 
@@ -247,15 +337,15 @@ def get_stats():
         return []
 
 
-def log_detection(bin_color, item_name, confidence=1.0):
+def log_detection(bin_color, item_name, confidence=1.0, image_path=None):
     """Enregistre une détection dans l'historique."""
     if not _conn:
         return False
     try:
         _conn.execute("""
-            INSERT INTO sorting_history (bin_color, item_name, timestamp, confidence)
-            VALUES (?, ?, ?, ?)
-        """, (bin_color, item_name, datetime.now().isoformat(), confidence))
+            INSERT INTO sorting_history (bin_color, item_name, timestamp, confidence, image_path)
+            VALUES (?, ?, ?, ?, ?)
+        """, (bin_color, item_name, datetime.now().isoformat(), confidence, image_path))
         
         # Mise à jour du bac : +1 item
         _conn.execute("""
@@ -304,18 +394,46 @@ def empty_bin(bin_color):
 
 
 def get_detection_history(limit=50):
-    """Retourne l'historique des détections."""
+    """Retourne l'historique des détections formaté avec images."""
     if not _conn:
         return []
     try:
-        return _conn.execute("""
-            SELECT bin_color, item_name, timestamp, confidence
+        rows = _conn.execute("""
+            SELECT id, timestamp, item_name, bin_color, confidence, image_path
             FROM sorting_history
             ORDER BY timestamp DESC
             LIMIT ?
         """, (limit,)).fetchall()
+        return rows
     except Exception:
         return []
+
+
+def get_total_detections():
+    """Nombre total de détections."""
+    if not _conn:
+        return 0
+    try:
+        result = _conn.execute("SELECT COUNT(*) FROM sorting_history").fetchone()
+        return result[0] if result else 0
+    except Exception:
+        return 0
+
+
+def get_detections_by_bin():
+    """Détections regroupées par bac."""
+    if not _conn:
+        return {}
+    try:
+        rows = _conn.execute("""
+            SELECT bin_color, COUNT(*) as count
+            FROM sorting_history
+            GROUP BY bin_color
+            ORDER BY bin_color ASC
+        """).fetchall()
+        return {row[0]: row[1] for row in rows}
+    except Exception:
+        return {}
 
 
 # ============================================
@@ -326,6 +444,26 @@ def run_manual_mode():
     """Boucle interactive : tu tapes le nom de l'objet, le système trie (DB + Arduino)."""
     init_database()
     init_serial_connection()
+    # Lancer les interfaces si demandé
+    try:
+        from config import ADMIN_AUTOSTART, ADMIN_INTERFACE_PORT, USER_INTERFACE_PORT
+        if ADMIN_AUTOSTART:
+            import socket, subprocess, sys
+            base = Path(__file__).resolve().parent.parent
+            admin_path = base / 'interfaces' / 'admin_interface' / 'app.py'
+            user_path = base / 'interfaces' / 'user_interface' / 'app.py'
+            try:
+                s = socket.socket(); s.settimeout(0.5); s.connect(('127.0.0.1', ADMIN_INTERFACE_PORT)); s.close()
+            except Exception:
+                if admin_path.exists():
+                    subprocess.Popen([sys.executable, str(admin_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            try:
+                s2 = socket.socket(); s2.settimeout(0.5); s2.connect(('127.0.0.1', USER_INTERFACE_PORT)); s2.close()
+            except Exception:
+                if user_path.exists():
+                    subprocess.Popen([sys.executable, str(user_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
     print("\n🤖 SMART BIN SI - MODE MANUEL (sans caméra)")
     print("Tape le nom d'un objet pour lancer le tri. 'stats' = statistiques, 'quit' = quitter.\n")
     try:

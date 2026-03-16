@@ -18,7 +18,22 @@ from config import (
     CAMERA_SOURCE, USE_CSI_CAMERA, FRAME_WIDTH, FRAME_HEIGHT, SHOW_DISPLAY,
     AUTO_SORT_DELAY, MIN_DETECTIONS, LEARNING_MODE, SAVE_IMAGES,
     TRAINING_DIR, BIN_COLORS,
+    ENABLE_POST_SORT_CONFIRMATION, ENABLE_SORT_PAUSE, SORT_PAUSE_SECONDS,
 )
+from config import ADMIN_AUTOSTART, ADMIN_INTERFACE_PORT, USER_INTERFACE_PORT
+import socket
+import subprocess
+import sys
+import os
+# Essayer de forcer la sortie en UTF-8 (évite UnicodeEncodeError sur Windows)
+try:
+    sys.stdout.reconfigure(encoding='utf-8')
+except Exception:
+    try:
+        import io
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    except Exception:
+        pass
 
 
 # ============================================
@@ -95,35 +110,61 @@ class WasteDetector:
         Supporte YOLOv5 et YOLOv8 via torch.hub ou ultralytics
         """
         print(f"📦 Chargement du modèle depuis : {model_path}")
-        
-        if not Path(model_path).exists():
-            print(f"⚠ Fichier du modèle introuvable : {model_path}")
-            print("   Utilisation du YOLOv5s par défaut (pré-entraîné sur COCO)")
-            print("   Pour utiliser un modèle custom, entraîne-le d'abord !")
-            
-            # Charger YOLOv5s pré-entraîné comme solution de secours
-            model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True)
-        else:
-            # Charger le modèle custom entraîné
+        # Première tentative : utiliser l'API ultralytics (si installée)
+        try:
+            from ultralytics import YOLO
+            # Si le modèle custom existe, on l'utilise, sinon on prend le yolov5s fourni au repo
+            if Path(model_path).exists():
+                model_file = str(model_path)
+            else:
+                model_file = str(Path(__file__).resolve().parent.parent / 'yolov5s.pt')
+
             try:
-                model = torch.hub.load('ultralytics/yolov5', 'custom', path=model_path)
-                print("✓ Modèle custom chargé avec succès")
-            except Exception as e:
-                print(f"✗ Erreur lors du chargement du modèle custom : {e}")
-                print("   Retour au YOLOv5s pré-entraîné")
-                model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True)
-        
-        # Définir les paramètres du modèle
-        model.conf = CONFIDENCE_THRESHOLD
-        model.iou = IOU_THRESHOLD
-        
-        # Utiliser le GPU si disponible (important pour Jetson)
-        if torch.cuda.is_available():
-            model = model.cuda()
-            print("✓ Accélération GPU activée")
-        else:
-            print("⚠ Exécution sur CPU (plus lent)")
-        
+                model = YOLO(model_file)
+                self._use_ultralytics = True
+                print(f"✓ Modèle chargé via ultralytics ({model_file})")
+            except Exception as e_load:
+                # Cas fréquent : checkpoint YOLOv5 incompatible avec ultralytics (module manquant)
+                print(f"[WARN] impossible de charger '{model_file}' via ultralytics: {e_load}")
+                print("→ Retraitement: utilisation d'un modèle ultralytics officiel léger (yolov8n.pt)")
+                model = YOLO('yolov8n.pt')
+                self._use_ultralytics = True
+                print("✓ Modèle yolov8n chargé via ultralytics (fallback)")
+        except Exception as e_ultra:
+            print(f"[WARN] ultralytics non disponible ou erreur: {e_ultra}")
+            # Fallback : essayer torch.hub (ancienne méthode)
+            try:
+                if Path(model_path).exists():
+                    model = torch.hub.load('ultralytics/yolov5', 'custom', path=model_path)
+                else:
+                    model = torch.hub.load('ultralytics/yolov5', 'yolov5s', pretrained=True)
+                self._use_ultralytics = False
+                print("✓ Modèle chargé via torch.hub (ultralytics/yolov5)")
+            except Exception as e_hub:
+                print(f"✗ Erreur lors du chargement du modèle : {e_hub}")
+                raise
+
+        # Note : pour ultralytics on passera conf/iou au moment de l'appel d'inférence.
+        # Pour torch.hub (yolov5), on laisse les attributs si disponibles.
+        try:
+            if hasattr(model, 'conf'):
+                model.conf = CONFIDENCE_THRESHOLD
+            if hasattr(model, 'iou'):
+                model.iou = IOU_THRESHOLD
+        except Exception:
+            pass
+
+        # Si CUDA disponible, on essayera d'activer (uniquement si l'objet le supporte)
+        try:
+            if torch.cuda.is_available():
+                if hasattr(model, 'to'):
+                    model = model.to('cuda')
+                print("✓ Accélération GPU activée")
+            else:
+                print("⚠ Exécution sur CPU (plus lent)")
+        except Exception:
+            pass
+
         return model
     
     def detect_waste(self, frame):
@@ -137,7 +178,15 @@ class WasteDetector:
             results: Résultats de détection YOLO
         """
         # Exécuter l'inférence
-        results = self.model(frame)
+        # Si on utilise ultralytics, passer conf/iou en paramètres
+        try:
+            if getattr(self, '_use_ultralytics', False):
+                results = self.model(frame, conf=CONFIDENCE_THRESHOLD, iou=IOU_THRESHOLD)
+            else:
+                results = self.model(frame)
+        except TypeError:
+            # Cas où le modèle n'accepte pas ces kwargs
+            results = self.model(frame)
         return results
     
     def process_detections(self, results):
@@ -151,34 +200,74 @@ class WasteDetector:
             list: Déchets détectés avec [nom_classe, confiance, bbox]
         """
         detections = []
-        
-        # Extraire les résultats (format dépend de YOLOv5 vs YOLOv8)
+        # Extraire les résultats selon le backend utilisé
         try:
-            # Format YOLOv5
-            predictions = results.pandas().xyxy[0]
-            
-            for idx, row in predictions.iterrows():
-                class_name = row['name']
-                confidence = row['confidence']
-                bbox = [row['xmin'], row['ymin'], row['xmax'], row['ymax']]
-                
-                detections.append({
-                    'class': class_name,
-                    'confidence': confidence,
-                    'bbox': bbox
-                })
-        except:
-            # Analyse alternative si pandas non disponible
-            pred = results.xyxy[0].cpu().numpy()
-            for detection in pred:
-                x1, y1, x2, y2, conf, cls = detection
-                class_name = self.model.names[int(cls)]
-                
-                detections.append({
-                    'class': class_name,
-                    'confidence': float(conf),
-                    'bbox': [float(x1), float(y1), float(x2), float(y2)]
-                })
+            if getattr(self, '_use_ultralytics', False):
+                # ultralytics retourne souvent une liste de Results ou un Results
+                res = results[0] if isinstance(results, list) else results
+                boxes = getattr(res, 'boxes', None)
+                if boxes is not None:
+                    # boxes.xyxy, boxes.conf, boxes.cls
+                    try:
+                        xyxy = boxes.xyxy.cpu().numpy()
+                    except Exception:
+                        xyxy = boxes.xyxy.numpy() if hasattr(boxes.xyxy, 'numpy') else []
+                    try:
+                        confs = boxes.conf.cpu().numpy()
+                    except Exception:
+                        confs = boxes.conf.numpy() if hasattr(boxes.conf, 'numpy') else []
+                    try:
+                        cls_idx = boxes.cls.cpu().numpy().astype(int)
+                    except Exception:
+                        cls_idx = boxes.cls.numpy().astype(int) if hasattr(boxes.cls, 'numpy') else []
+
+                    for i, bbox in enumerate(xyxy):
+                        x1, y1, x2, y2 = [float(v) for v in bbox]
+                        confidence = float(confs[i]) if i < len(confs) else 0.0
+                        cls = int(cls_idx[i]) if i < len(cls_idx) else 0
+                        class_name = None
+                        if hasattr(self.model, 'names'):
+                            try:
+                                class_name = self.model.names[cls]
+                            except Exception:
+                                class_name = str(cls)
+                        else:
+                            class_name = str(cls)
+
+                        detections.append({
+                            'class': class_name,
+                            'confidence': confidence,
+                            'bbox': [x1, y1, x2, y2]
+                        })
+                else:
+                    # Pas de boxes → pas de détections
+                    return []
+            else:
+                # Ancien format (torch.hub / yolov5)
+                try:
+                    predictions = results.pandas().xyxy[0]
+                    for idx, row in predictions.iterrows():
+                        class_name = row['name']
+                        confidence = row['confidence']
+                        bbox = [row['xmin'], row['ymin'], row['xmax'], row['ymax']]
+                        detections.append({
+                            'class': class_name,
+                            'confidence': confidence,
+                            'bbox': bbox
+                        })
+                except Exception:
+                    pred = results.xyxy[0].cpu().numpy()
+                    for detection in pred:
+                        x1, y1, x2, y2, conf, cls = detection
+                        class_name = self.model.names[int(cls)] if hasattr(self.model, 'names') else str(int(cls))
+                        detections.append({
+                            'class': class_name,
+                            'confidence': float(conf),
+                            'bbox': [float(x1), float(y1), float(x2), float(y2)]
+                        })
+        except Exception as e:
+            print(f"⚠ Erreur extraction détections: {e}")
+            return []
         
         return detections
     
@@ -423,25 +512,49 @@ class WasteDetector:
                     if self.should_trigger_sort(best_detection):
                         waste_class = best_detection['class']
                         
-                        # En mode apprentissage, demander confirmation
+                        # En mode apprentissage, demander confirmation AVANT le tri
                         if LEARNING_MODE:
                             corrected_class = self.handle_correction(self.last_frame, best_detection)
                             if corrected_class is None:
                                 continue  # Ignoré par l'utilisateur
                             waste_class = corrected_class
                         
-                        print(f"\n🎯 TRI AUTO DÉCLENCHÉ : {waste_class}")
+                        print(f"\n🎯 OBJET DÉTECTÉ : {waste_class}")
                         
-                        # Utiliser waste_classifier pour le tri
-                        # ask_if_unknown=True pour permettre d'apprendre
+                        # Déterminer le bac (demande via UI si inconnu), sans effectuer le tri immédiatement
                         bin_color = waste_classifier.classify_and_sort(
                             waste_class,
                             ask_if_unknown=True,
-                            auto_mode=False
+                            auto_mode=False,
+                            perform_sort=False
                         )
-                        
-                        if bin_color:
-                            print(f"✓ Trié vers le bac {bin_color}")
+
+                        if not bin_color:
+                            continue
+
+                        # Si mode apprentissage, demander confirmation AVANT le tri
+                        if LEARNING_MODE:
+                            confirmed = waste_classifier.ask_confirmation(waste_class, bin_color)
+                            if not confirmed:
+                                print("❌ Tri annulé par l'utilisateur (mode apprentissage)")
+                                continue
+
+                        # Envoi du tri à l'Arduino / simulation
+                        waste_classifier.send_sort_command(bin_color)
+
+                        # Confirmation après tri (toujours possible depuis l'UI) - lancée immédiatement
+                        if ENABLE_POST_SORT_CONFIRMATION:
+                            is_correct = waste_classifier.ask_confirmation(waste_class, bin_color)
+                            if is_correct:
+                                print("✅ Tri confirmé")
+                            else:
+                                print("❌ Tri non confirmé")
+
+                        # Pause pour laisser le temps à l'objet d'être trié physiquement
+                        if ENABLE_SORT_PAUSE and SORT_PAUSE_SECONDS > 0:
+                            print(f"⏸️  Attente {SORT_PAUSE_SECONDS} secondes pour le tri...")
+                            time.sleep(SORT_PAUSE_SECONDS)
+
                 
                 # Calculer les FPS
                 fps_counter += 1
@@ -530,6 +643,96 @@ class WasteDetector:
 
 def main():
     """Exécuter la détection YOLO"""
+    from config import ADMIN_AUTOSTART
+    
+    # Menu de choix des interfaces si ADMIN_AUTOSTART est désactivé
+    admin_interface_required = False
+    user_interface_required = False
+    
+    if not ADMIN_AUTOSTART:
+        print("\n" + "="*60)
+        print("DÉCLARATION DU SYSTÈME DE SMART BIN SI")
+        print("="*60)
+        print("\nQuelle interface voulez-vous lancer ?")
+        print("1. 🔹 Admin uniquement (supervision complète)")
+        print("2. 👤 User uniquement (affectation des objets)")
+        print("3. 🔹👤 Admin + User (complète)")
+        print("4. ⚙️  Aucune interface (détection caméra uniquement)")
+        print("="*60)
+        
+        choice = input("\nVotre choix (1-4) : ").strip()
+        
+        if choice == "1":
+            admin_interface_required = True
+            print("\n→ Lancement de l'interface Admin uniquement\n")
+        elif choice == "2":
+            user_interface_required = True
+            print("\n→ Lancement de l'interface User uniquement\n")
+        elif choice == "3":
+            admin_interface_required = True
+            user_interface_required = True
+            print("\n→ Lancement de l'interface Admin + User\n")
+        elif choice == "4":
+            print("\n→ Mode sans interface (détection caméra uniquement)\n")
+        else:
+            print("\n⚠ Choix invalide ! Démarrage avec Admin + User par défaut\n")
+            admin_interface_required = True
+            user_interface_required = True
+    else:
+        # Si ADMIN_AUTOSTART est activé, lancer automatiquement admin et user
+        admin_interface_required = True
+        user_interface_required = True
+    
+    # Lancer les interfaces selon le choix
+    if admin_interface_required or user_interface_required:
+        print("🚀 Démarrage des interfaces...")
+        
+        # Admin interface
+        if admin_interface_required:
+            try:
+                s = socket.socket()
+                s.settimeout(0.5)
+                try:
+                    s.connect(("127.0.0.1", ADMIN_INTERFACE_PORT))
+                    s.close()
+                    print(f"→ Interface admin déjà en écoute sur le port {ADMIN_INTERFACE_PORT}")
+                except Exception:
+                    admin_path = Path(__file__).resolve().parent.parent / 'interfaces' / 'admin_interface' / 'app.py'
+                    if admin_path.exists():
+                        print(f"→ Démarrage interface admin ({ADMIN_INTERFACE_PORT})")
+                        try:
+                            subprocess.Popen([sys.executable, str(admin_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                            time.sleep(1)
+                            print(f"   ✓ Admin disponible à http://127.0.0.1:{ADMIN_INTERFACE_PORT}")
+                        except Exception as e:
+                            print(f"   ⚠ Impossible de lancer l'interface admin: {e}")
+            except Exception as e:
+                print(f"   ⚠ Erreur au démarrage de l'interface admin: {e}")
+        
+        # User interface
+        if user_interface_required:
+            try:
+                s2 = socket.socket()
+                s2.settimeout(0.5)
+                s2.connect(("127.0.0.1", USER_INTERFACE_PORT))
+                s2.close()
+                print(f"→ Interface utilisateur déjà en écoute sur le port {USER_INTERFACE_PORT}")
+            except Exception:
+                user_path = Path(__file__).resolve().parent.parent / 'interfaces' / 'user_interface' / 'app.py'
+                if user_path.exists():
+                    print(f"→ Démarrage interface user ({USER_INTERFACE_PORT})")
+                    try:
+                        subprocess.Popen([sys.executable, str(user_path)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        time.sleep(1)
+                        print(f"   ✓ User disponible à http://127.0.0.1:{USER_INTERFACE_PORT}")
+                    except Exception as e:
+                        print(f"   ⚠ Impossible de lancer l'interface utilisateur: {e}")
+            except Exception as e:
+                print(f"   ⚠ Erreur au démarrage de l'interface user: {e}")
+        
+        print()
+    
+    # Lancer la détection YOLO
     detector = WasteDetector()
     detector.run_camera_detection()
 

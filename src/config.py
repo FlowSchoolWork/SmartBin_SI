@@ -45,33 +45,39 @@ SORTING_DURATION = 10          # Durée d'attente pour le tri en secondes
 # ============================================
 # CONFIGURATION DE L'APPRENTISSAGE
 # ============================================
-LEARNING_MODE = True      # Mode apprentissage : validation manuelle des détections
-SAVE_IMAGES = True        # Sauvegarder les images de détection
-MIN_DETECTIONS = 3        # Nombre minimum de détections consécutives avant tri
-AUTO_SORT_DELAY = 2.0     # Délai entre deux opérations de tri en secondes
+LEARNING_MODE = False      # Mode apprentissage : validation manuelle des détections (pré-tri)
+SAVE_IMAGES = True         # Sauvegarder les images de détection
+MIN_DETECTIONS = 3         # Nombre minimum de détections consécutives avant tri
+AUTO_SORT_DELAY = 2.0      # Délai entre deux opérations de tri en secondes
+
+# ============================================
+# COMPORTEMENT APRÈS TRI
+# ============================================
+ENABLE_POST_SORT_CONFIRMATION = True  # Demander confirmation dans l'UI après avoir trié
+ENABLE_SORT_PAUSE = False              # Mettre en pause le traitement après le tri
+SORT_PAUSE_SECONDS = 5                # Durée de la pause après le tri (secondes)
 
 # ============================================
 # CONFIGURATION DES BACS DE TRI
 # ============================================
-VALID_BINS = ["yellow", "green", "brown"]  # Bacs de tri valides
+VALID_BINS = ["yellow", "green", "brown", "black"]  # Bacs de tri valides
 
 # Mapping par défaut des objets détectés vers les bacs
-# jaune=recyclable, vert=organique, marron=déchets généraux
-# Les nouveaux objets appris sont stockés en base de données
+# jaune=emballages et papiers, vert=verre, marron=biodéchets, noir=ordures ménagères
 WASTE_TO_BIN_MAPPING = {
     "plastic": "yellow",
     "plastic_bottle": "yellow",
-    "bottle": "yellow",
+    "bottle": "green",  # verre
     "cardboard": "yellow",
     "paper": "yellow",
     "metal": "yellow",
-    "glass": "yellow",
+    "glass": "green",
     "can": "yellow",
-    "banana_peel": "green",
-    "food": "green",
-    "organic": "green",
-    "tissue": "brown",
-    "trash": "brown",
+    "banana_peel": "brown",
+    "food": "brown",
+    "organic": "brown",
+    "tissue": "black",
+    "trash": "black",
 }
 
 # Couleurs pour l'affichage OpenCV (format BGR)
@@ -79,5 +85,22 @@ BIN_COLORS = {
     "yellow": (0, 255, 255),  # Jaune
     "green": (0, 255, 0),     # Vert
     "brown": (50, 100, 165),  # Marron
+    "black": (0, 0, 0),       # Noir
     "unknown": (128, 128, 128)  # Gris pour inconnu
 }
+
+# ============================================
+# OPTIONS D'INTERFACES
+# ============================================
+# Démarrage automatique de l'interface administrateur lorsque l'on lance
+# les composants principaux (yolo / manual waste). Si True, le serveur
+# Flask présent dans `admin_interface/app.py` sera lancé automatiquement
+# si aucun service n'écoute sur `ADMIN_INTERFACE_PORT`.
+ADMIN_AUTOSTART = True
+ADMIN_INTERFACE_PORT = 5000
+
+# Interface utilisateur web (petite UI pour affecter un objet inconnu)
+# Si activée, `waste_classifier` tentera d'envoyer la question à
+# l'interface et d'attendre une réponse avant de retomber sur la console.
+USER_INTERFACE_ENABLED = True
+USER_INTERFACE_PORT = 5001

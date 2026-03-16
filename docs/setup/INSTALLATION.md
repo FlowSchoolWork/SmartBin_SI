@@ -201,7 +201,7 @@ Vérification…
 
 1. Outils → Moniteur série
 2. Définir le baud : **9600**
-3. Entrer `yellow` ou `green` ou `brown`
+3. Entrer `yellow`, `green`, `brown` ou `black`
 4. Appuyer sur Entrée
 5. Vérifier que les servos bougent
 
@@ -237,11 +237,14 @@ Objet >
 plastic_bottle
 → ✓ Tri vers bac yellow
 
-banana
+bottle
 → ✓ Tri vers bac green
 
-tissue
+banana
 → ✓ Tri vers bac brown
+
+tissue
+→ ✓ Tri vers bac black
 
 stats
 → Affiche les statistiques
