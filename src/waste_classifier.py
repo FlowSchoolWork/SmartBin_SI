@@ -277,19 +277,21 @@ def send_sort_command(bin_color):
     return True
 
 
-def classify_and_sort(item_name, ask_if_unknown=True, auto_mode=False, confidence=1.0, perform_sort=True):
+def classify_and_sort(item_name, ask_if_unknown=True, auto_mode=False, confidence=1.0, perform_sort=True, image_path=None):
     """
     Détermine le bac pour l'objet, enregistre si nouveau, et optionnellement envoie la commande de tri.
     - ask_if_unknown: si True, demande à l'utilisateur pour un objet inconnu
     - auto_mode: si True, utilise uniquement le mapping sans demander
     - confidence: confiance de la détection (0-1)
     - perform_sort: si True, envoie aussi la commande de tri à l'Arduino
-    Retourne la couleur du bac utilisée, ou None.
+    - image_path: path relatif de l'image de détection (optionnel)
+    Retourne (couleur_du_bac, était_connu), ou (None, False) si annulé.
     """
     if not item_name:
-        return None
+        return None, False
     item_name = item_name.strip().lower()
     bin_color = get_bin_color(item_name)
+    was_known = bin_color is not None
 
     if bin_color is None:
         if ask_if_unknown and not auto_mode:
@@ -297,7 +299,7 @@ def classify_and_sort(item_name, ask_if_unknown=True, auto_mode=False, confidenc
             if bin_color:
                 save_to_database(item_name, bin_color)
         else:
-            return None
+            return None, False
     else:
         # Incrémenter usage_count
         if _conn:
@@ -312,7 +314,7 @@ def classify_and_sort(item_name, ask_if_unknown=True, auto_mode=False, confidenc
 
     if bin_color:
         # LOG LA DÉTECTION
-        log_detection(bin_color, item_name, confidence)
+        log_detection(bin_color, item_name, confidence, image_path)
         
         # Envoi optionnel du tri vers l'Arduino
         if perform_sort:
@@ -320,7 +322,7 @@ def classify_and_sort(item_name, ask_if_unknown=True, auto_mode=False, confidenc
             if _serial and _serial.is_open:
                 import time
                 time.sleep(SORTING_DURATION)
-    return bin_color
+    return bin_color, was_known
 
 
 def get_stats():
@@ -480,7 +482,7 @@ def run_manual_mode():
                     print(f"  {r[0]:20} → {r[1]} ({r[2]} utilisations)")
                 print()
                 continue
-            bin_color = classify_and_sort(name, ask_if_unknown=True, auto_mode=False)
+            bin_color, _ = classify_and_sort(name, ask_if_unknown=True, auto_mode=False)
             if bin_color:
                 print(f"✓ Tri vers bac {bin_color}\n")
             else:

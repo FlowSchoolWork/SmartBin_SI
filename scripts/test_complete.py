@@ -97,7 +97,7 @@ def test_waste_classifier():
         waste_classifier.init_serial_connection()
         
         # Test classification
-        bin_color = waste_classifier.classify_and_sort(
+        bin_color, _ = waste_classifier.classify_and_sort(
             "plastic_bottle",
             ask_if_unknown=False,
             auto_mode=True,
@@ -106,7 +106,7 @@ def test_waste_classifier():
         print(f"✓ Classification: 'plastic_bottle' → {bin_color}")
         
         # Test objet inconnu
-        bin_color2 = waste_classifier.classify_and_sort(
+        bin_color2, _ = waste_classifier.classify_and_sort(
             "unknown_object",
             ask_if_unknown=False,
             auto_mode=True

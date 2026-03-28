@@ -11,6 +11,7 @@ import time
 import numpy as np
 from pathlib import Path
 from datetime import datetime
+import threading
 
 import waste_classifier
 from config import (
@@ -19,6 +20,7 @@ from config import (
     AUTO_SORT_DELAY, MIN_DETECTIONS, LEARNING_MODE, SAVE_IMAGES,
     TRAINING_DIR, BIN_COLORS,
     ENABLE_POST_SORT_CONFIRMATION, ENABLE_SORT_PAUSE, SORT_PAUSE_SECONDS,
+    DETECTION_IMAGES_DIR,
 )
 from config import ADMIN_AUTOSTART, ADMIN_INTERFACE_PORT, USER_INTERFACE_PORT
 import socket
@@ -401,15 +403,32 @@ class WasteDetector:
                 f.write(f"{class_id} {x_center:.6f} {y_center:.6f} {width:.6f} {height:.6f}\n")
         print(f"💾 Image sauvegardée pour apprentissage : {filename.name} ({class_name})")
     
-    def _class_name_to_id(self, class_name):
-        """Retourne l'index de la classe dans le modèle (pour le label YOLO)."""
-        if not hasattr(self.model, "names"):
+    def save_detection_image(self, frame, waste_class, confidence):
+        """
+        Sauvegarde l'image de détection pour l'historique admin.
+        Retourne le path relatif pour stockage en DB.
+        """
+        if not SAVE_IMAGES:
             return None
-        names = self.model.names  # dict int -> str
-        for idx, name in names.items():
-            if name == class_name:
-                return idx
-        return None
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"detection_{timestamp}_{waste_class}_{int(confidence*100)}.jpg"
+        filepath = DETECTION_IMAGES_DIR / filename
+        cv2.imwrite(str(filepath), frame)
+        # Retourner le path relatif par rapport à DATA_DIR
+        return f"detection_images/{filename}"
+    
+    def handle_post_sort_confirmation(self, waste_class, bin_color):
+        """
+        Gère la confirmation post-tri en arrière-plan (non-bloquant pour la détection)
+        """
+        try:
+            is_correct = waste_classifier.ask_confirmation(waste_class, bin_color)
+            if is_correct:
+                print("✅ Tri confirmé")
+            else:
+                print("❌ Tri non confirmé")
+        except Exception as e:
+            print(f"⚠ Erreur confirmation post-tri : {e}")
 
     def handle_correction(self, frame, best_detection):
         """
@@ -521,12 +540,17 @@ class WasteDetector:
                         
                         print(f"\n🎯 OBJET DÉTECTÉ : {waste_class}")
                         
+                        # Sauvegarder l'image de détection pour l'admin
+                        image_path = self.save_detection_image(self.last_frame, waste_class, best_detection['confidence'])
+                        
                         # Déterminer le bac (demande via UI si inconnu), sans effectuer le tri immédiatement
-                        bin_color = waste_classifier.classify_and_sort(
+                        bin_color, was_known = waste_classifier.classify_and_sort(
                             waste_class,
                             ask_if_unknown=True,
                             auto_mode=False,
-                            perform_sort=False
+                            perform_sort=False,
+                            confidence=best_detection['confidence'],
+                            image_path=image_path
                         )
 
                         if not bin_color:
@@ -542,18 +566,25 @@ class WasteDetector:
                         # Envoi du tri à l'Arduino / simulation
                         waste_classifier.send_sort_command(bin_color)
 
-                        # Confirmation après tri (toujours possible depuis l'UI) - lancée immédiatement
-                        if ENABLE_POST_SORT_CONFIRMATION:
-                            is_correct = waste_classifier.ask_confirmation(waste_class, bin_color)
-                            if is_correct:
-                                print("✅ Tri confirmé")
-                            else:
-                                print("❌ Tri non confirmé")
-
-                        # Pause pour laisser le temps à l'objet d'être trié physiquement
+                        # Démarrer le chronomètre physique de chute (durée de tri)
+                        sort_end_time = None
                         if ENABLE_SORT_PAUSE and SORT_PAUSE_SECONDS > 0:
-                            print(f"⏸️  Attente {SORT_PAUSE_SECONDS} secondes pour le tri...")
-                            time.sleep(SORT_PAUSE_SECONDS)
+                            sort_end_time = time.time() + SORT_PAUSE_SECONDS
+                            print(f"⏸️  Tri en cours... {SORT_PAUSE_SECONDS} secondes pour que l'objet tombe.")
+
+                        # Confirmation après tri (UI) lancée en arrière-plan, seulement pour objets connus
+                        if ENABLE_POST_SORT_CONFIRMATION and was_known:
+                            threading.Thread(
+                                target=self.handle_post_sort_confirmation,
+                                args=(waste_class, bin_color),
+                                daemon=True
+                            ).start()
+
+                        # Attendre la fin de la chute si nécessaire
+                        if sort_end_time:
+                            remaining = sort_end_time - time.time()
+                            if remaining > 0:
+                                time.sleep(remaining)
 
                 
                 # Calculer les FPS
@@ -600,7 +631,7 @@ class WasteDetector:
                             waste_class,
                             ask_if_unknown=True,
                             auto_mode=False
-                        )
+                        )[0]  # On ignore was_known pour le tri forcé
                 
                 elif key == ord('r'):
                     # Réinitialiser le compteur

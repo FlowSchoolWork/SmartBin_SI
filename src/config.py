@@ -18,13 +18,15 @@ MODELS_DIR = BASE_DIR / "models"
 DATA_DIR.mkdir(exist_ok=True)
 TRAINING_DIR.mkdir(exist_ok=True)
 MODELS_DIR.mkdir(exist_ok=True)
+DETECTION_IMAGES_DIR = DATA_DIR / "detection_images"
+DETECTION_IMAGES_DIR.mkdir(exist_ok=True)
 
 # ============================================
 # CONFIGURATION DU MODÈLE YOLO
 # ============================================
-MODEL_PATH = str(MODELS_DIR / "best.pt")  # Chemin vers le modèle YOLO entraîné
-CONFIDENCE_THRESHOLD = 0.6                # Seuil de confiance pour les détections
-IOU_THRESHOLD = 0.45                      # Seuil d'intersection sur union pour NMS
+MODEL_PATH = str(MODELS_DIR / "best_model.pt")  # Chemin vers le modèle YOLO entraîné
+CONFIDENCE_THRESHOLD = 0.6                      # Seuil de confiance pour les détections
+IOU_THRESHOLD = 0.45                            # Seuil d'intersection sur union pour NMS
 
 # ============================================
 # CONFIGURATION DE LA CAMÉRA
@@ -54,7 +56,7 @@ AUTO_SORT_DELAY = 2.0      # Délai entre deux opérations de tri en secondes
 # COMPORTEMENT APRÈS TRI
 # ============================================
 ENABLE_POST_SORT_CONFIRMATION = True  # Demander confirmation dans l'UI après avoir trié
-ENABLE_SORT_PAUSE = False              # Mettre en pause le traitement après le tri
+ENABLE_SORT_PAUSE = True             # Mettre en pause le traitement après le tri
 SORT_PAUSE_SECONDS = 5                # Durée de la pause après le tri (secondes)
 
 # ============================================
@@ -67,7 +69,7 @@ VALID_BINS = ["yellow", "green", "brown", "black"]  # Bacs de tri valides
 WASTE_TO_BIN_MAPPING = {
     "plastic": "yellow",
     "plastic_bottle": "yellow",
-    "bottle": "green",  # verre
+    "bottle": "green",   # verre
     "cardboard": "yellow",
     "paper": "yellow",
     "metal": "yellow",

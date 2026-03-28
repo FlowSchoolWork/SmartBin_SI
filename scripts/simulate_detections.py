@@ -49,7 +49,7 @@ def main():
             obj_name, expected_color, confidence = random.choice(objects)
             
             # Classification
-            bin_color = waste_classifier.classify_and_sort(
+            bin_color, _ = waste_classifier.classify_and_sort(
                 obj_name,
                 ask_if_unknown=False,
                 auto_mode=True,
